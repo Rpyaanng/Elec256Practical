@@ -1,0 +1,1058 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ELEC-256 Practical Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed 3D bench, paper "lab sheet" panels floating left (guide) and right (instruments), work dock bottom-centre. Single deliberate light lab look. */
+:root{
+  color-scheme: light;
+  --bench:#c3ccd1;
+  --paper:#f6f7f5;
+  --paper-2:#eceeeb;
+  --ink:#1b2127;
+  --muted:#5b6670;
+  --line:#cdd3d7;
+  --jack:#c42f27;      /* banana-jack red, also the instructor stamp */
+  --lead-blue:#2c63c9;
+  --ok:#287a4b;
+  --warn:#a8691a;
+  --bad:#b8322a;
+  --lcd:#0f2a2c;
+  --lcd-ink:#5fe3d8;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bench);color:var(--ink);font-family:var(--f-body);font-size:14px;overflow:hidden}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--lead-blue);outline-offset:2px}
+
+.app{position:relative;height:100%;width:100%}
+#stage{position:absolute;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+
+/* top bar */
+.topbar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  pointer-events:none}
+.topbar>*{pointer-events:auto}
+.brand{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:4px 12px 3px;border-radius:3px}
+.brand small{font-weight:500;opacity:.7;margin-left:6px;font-size:16px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase;background:var(--paper);border:1px solid var(--line);color:var(--muted);padding:3px 10px;border-radius:999px;display:flex;gap:6px;align-items:center}
+.pill b{font-family:var(--f-mono);font-weight:500;font-size:12px;letter-spacing:0}
+.pill.cur{border-color:var(--ink);color:var(--ink)}
+.pill.done{color:var(--ok);border-color:var(--ok)}
+.spacer{flex:1}
+.chip{font-family:var(--f-mono);font-size:13px;background:var(--paper);border:1px solid var(--line);padding:4px 10px;border-radius:4px;font-variant-numeric:tabular-nums}
+.btn{background:var(--paper);border:1px solid var(--ink);border-radius:4px;padding:6px 12px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--paper-2)}
+.btn.primary{background:var(--ink);color:var(--paper)}
+.btn.primary:hover{background:#333c45}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* panels */
+.panel{position:absolute;z-index:4;background:var(--paper);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(20,30,40,.14);overflow:auto}
+.panel.left{left:max(16px,env(safe-area-inset-left,0px));top:64px;width:330px;max-height:calc(100% - 80px)}
+.panel.right{right:max(16px,env(safe-area-inset-right,0px));top:64px;width:292px;max-height:calc(100% - 80px)}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.sec:last-child{border-bottom:0}
+.lbl{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lbl .r{font-family:var(--f-mono);font-size:11px;letter-spacing:0;text-transform:none}
+h2{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1.05;margin:0;text-wrap:balance}
+p{margin:0;line-height:1.5}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--paper-2)}
+
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--paper);padding:5px 10px;cursor:pointer;font-weight:500;font-size:13px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.swatches{display:flex;gap:6px}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--paper);box-shadow:0 0 0 1px var(--line);cursor:pointer}
+.sw.on{box-shadow:0 0 0 2px var(--ink)}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tool{border:1px solid var(--line);background:var(--paper);border-radius:4px;padding:6px 8px;cursor:pointer;text-align:left;font-size:13px;display:flex;gap:6px;align-items:center}
+.tool.on{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+
+.readout{font-family:var(--f-mono);font-variant-numeric:tabular-nums;background:var(--lcd);color:var(--lcd-ink);border-radius:4px;padding:8px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.readout .big{font-size:22px;font-weight:500;letter-spacing:.02em}
+.readout .unit{font-size:12px;opacity:.8}
+.readout.ps{background:#1d1414;color:#ff6a4f}
+.readout.hh{background:#b7c2b3;color:#16201a}
+.setp{display:flex;align-items:center;gap:4px}
+.setp .val{font-family:var(--f-mono);min-width:64px;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
+.probeinfo{font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+
+/* guide */
+.stepcard{display:flex;flex-direction:column;gap:8px}
+.stepno{font-family:var(--f-mono);font-size:12px;color:var(--jack)}
+.spec{font-size:13px;line-height:1.5;background:var(--paper-2);border-radius:4px;padding:8px 10px}
+.spec b{font-family:var(--f-mono);font-weight:600}
+.schem{width:100%;height:auto;color:var(--ink)}
+.fb{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.fb li{display:grid;grid-template-columns:18px 1fr auto;gap:6px;font-size:13px;line-height:1.4;align-items:start}
+.fb .ic{font-weight:700}
+.fb .ok .ic{color:var(--ok)} .fb .no .ic{color:var(--bad)} .fb .part .ic{color:var(--warn)}
+.fb .pts{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding-left:8px}
+
+/* dock */
+.dock{position:absolute;z-index:4;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));width:min(760px,calc(100% - 660px));min-width:400px;background:var(--paper);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(20,30,40,.16);max-height:52%;overflow:auto}
+.dock:empty{display:none}
+.dock .sec{gap:10px}
+.ohmbox{border:1.5px solid var(--ink);padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
+.ohmbox label{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:15px}
+.ohmbox input,.chart input{font-family:var(--f-mono);font-size:14px;border:0;border-bottom:1.5px solid var(--ink);background:transparent;padding:3px 2px;width:100%;min-width:0;font-variant-numeric:tabular-nums}
+input,select,option,textarea{color:var(--ink);-webkit-text-fill-color:var(--ink);caret-color:var(--ink);color-scheme:light}
+input::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);opacity:1}
+input:disabled,select:disabled{opacity:.75}
+select,option{background:var(--paper)}
+.chart input.good{-webkit-text-fill-color:var(--ok)}
+.chart input.badv{-webkit-text-fill-color:var(--bad)}
+.stampbox{position:relative;height:42px;border-bottom:1.5px solid var(--ink)}
+.stamp{position:absolute;left:8px;top:-2px;font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.06em;color:var(--jack);border:3px double var(--jack);padding:0 10px;transform:rotate(-6deg);opacity:.9;text-transform:uppercase;animation:stampin .35s ease-out}
+@keyframes stampin{from{transform:rotate(-6deg) scale(1.8);opacity:0}to{transform:rotate(-6deg) scale(1);opacity:.9}}
+.chartwrap{overflow-x:auto}
+.chart{border-collapse:collapse;width:100%;min-width:640px}
+.chart th[scope=row]{white-space:nowrap}
+.chart td.tl{font-family:var(--f-mono);font-size:12px;white-space:nowrap;background:var(--paper-2)}
+.chart .cell input{width:50px;flex:1 1 50px;min-width:0}
+.chart select{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:3px;padding:1px 2px}
+.fb .info .ic{color:var(--lead-blue)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.chart th,.chart td{border:1px solid var(--ink);padding:4px 8px;text-align:left;font-size:13px}
+.chart th{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.05em;font-size:14px;background:var(--paper-2)}
+.chart td.na{background:repeating-linear-gradient(135deg,var(--paper-2) 0 4px,var(--paper) 4px 8px)}
+.chart .cell{display:flex;align-items:center;gap:4px}
+.chart .u{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.chart input.good{color:var(--ok);border-color:var(--ok)}
+.chart input.badv{color:var(--bad);border-color:var(--bad)}
+.req{font-size:15px;line-height:1.45;border-left:4px solid var(--jack);padding:4px 10px;background:var(--paper-2)}
+
+/* tooltip/toast */
+.tip{position:absolute;z-index:6;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;padding:3px 7px;border-radius:3px;white-space:nowrap;transform:translate(12px,12px)}
+.toast{position:absolute;z-index:7;left:50%;top:64px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:4px;font-size:13.5px;max-width:min(520px,calc(100% - 32px));box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .25s}
+.toast.bad{background:var(--bad)}
+.toast.good{background:var(--ok)}
+
+/* overlays */
+.overlay{position:absolute;inset:0;z-index:10;background:rgba(195,204,209,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;overflow:auto;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet{background:var(--paper);border:1px solid var(--line);border-radius:6px;box-shadow:0 20px 60px rgba(20,30,40,.25);width:min(760px,100%);padding:26px 28px;display:flex;flex-direction:column;gap:18px;margin:auto}
+.sheet h1{font-family:var(--f-display);font-size:44px;line-height:.95;margin:0;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+.sheet h1 span{color:var(--jack)}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice{border:1.5px solid var(--ink);border-radius:6px;padding:16px;text-align:left;background:var(--paper);cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.choice:hover{background:var(--paper-2)}
+.choice .t{font-family:var(--f-display);font-weight:700;font-size:26px;text-transform:uppercase}
+.choice ul{margin:0;padding-left:18px;line-height:1.5;font-size:13px;color:var(--muted)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl td,.tbl th{border-bottom:1px solid var(--line);padding:7px 4px;text-align:left;vertical-align:top;font-size:13.5px}
+.tbl th{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tbl td.n{font-family:var(--f-mono);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.total{font-family:var(--f-display);font-weight:700;font-size:64px;line-height:1}
+.total small{font-size:28px;color:var(--muted)}
+
+@media (max-width: 1100px){
+  .dock{width:min(560px,calc(100% - 32px));left:50%;min-width:0}
+  .panel.left{width:290px}
+  .panel.right{width:260px}
+}
+@media (max-width: 900px){
+  body{overflow:auto}
+  .app{height:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+  .topbar{position:relative;order:0}
+  #stage{position:relative;order:1;height:58vh;min-height:320px;inset:auto}
+  .dock{position:relative;order:2;transform:none;left:auto;bottom:auto;width:auto;margin-inline:max(16px,env(safe-area-inset-left,0px));max-height:none}
+  .panel{position:relative;left:auto!important;right:auto!important;top:auto!important;width:auto!important;max-height:none;margin-inline:max(16px,env(safe-area-inset-left,0px))}
+  .panel.right{order:3}.panel.left{order:4}
+  .toast{position:fixed}
+  .tip{display:none}
+  .choices{grid-template-columns:1fr}
+  .sheet h1{font-size:34px}
+}
+@media (prefers-reduced-motion: reduce){ .stamp{animation:none} }
+</style>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">ELEC-256<small>Practical Bench</small></div>
+    <div class="pills" id="pills"></div>
+    <div class="spacer"></div>
+    <div class="chip" id="modeChip">—</div>
+    <div class="chip" id="timer" hidden>00:00</div>
+    <button class="btn sm" id="menuBtn">Change mode</button>
+  </header>
+
+  <div id="stage"></div>
+
+  <aside class="panel left" id="guide"></aside>
+
+  <aside class="panel right" id="inst">
+    <div class="sec">
+      <div class="lbl">Leads <span class="r" id="leadCount">0 leads</span></div>
+      <div class="swatches" id="swatches"></div>
+      <div class="tools" id="tools">
+        <button class="tool" data-tool="lead" id="t-lead"><span class="dot" id="leadDot"></span>Banana lead</button>
+        <button class="tool" data-tool="remove" id="t-remove">✕ Remove lead</button>
+        <button class="tool" data-tool="probeRed" id="t-pr"><span class="dot" style="background:#c42f27"></span>Red probe</button>
+        <button class="tool" data-tool="probeBlack" id="t-pb"><span class="dot" style="background:#1f2226"></span>Black probe</button>
+      </div>
+      <div class="row"><button class="btn sm" id="undoBtn">Undo lead</button><button class="btn sm" id="clearProbes">Lift probes</button><button class="btn sm danger" id="clearAll">Clear bench</button></div>
+    </div>
+    <div class="sec">
+      <div class="lbl">DC power supply <span class="r" id="psState">OFF</span></div>
+      <div class="readout ps"><span class="big" id="psV">0.0</span><span class="unit">V</span><span class="big" id="psI" style="font-size:16px">0.000</span><span class="unit" id="psMode">A</span></div>
+      <div class="row" style="justify-content:space-between">
+        <div class="setp">
+          <button class="btn sm" data-dv="-1">−1</button><button class="btn sm" data-dv="-0.1">−.1</button>
+          <span class="val" id="psSet">0.0 V</span>
+          <button class="btn sm" data-dv="0.1">+.1</button><button class="btn sm" data-dv="1">+1</button>
+        </div>
+      </div>
+      <button class="btn" id="psToggle">Turn supply ON</button>
+    </div>
+    <div class="sec">
+      <div class="lbl">Bench multimeter <span class="r">in series as ammeter</span></div>
+      <div class="seg" id="benchSeg"><button data-m="DCV">DCV</button><button data-m="DCI">DCI</button></div>
+      <div class="readout"><span class="big" id="benchVal">0.000000</span><span class="unit" id="benchUnit">V⎓</span></div>
+    </div>
+    <div class="sec">
+      <div class="lbl">Handheld DMM <span class="r">probes</span></div>
+      <div class="seg" id="handSeg"><button data-m="OFF">OFF</button><button data-m="V">V⎓</button><button data-m="OHM">Ω</button></div>
+      <div class="readout hh"><span class="big" id="handVal">----</span><span class="unit" id="handUnit"></span></div>
+      <div class="probeinfo" id="probeInfo"></div>
+      <p class="small muted">Tip: click a probe on the bench to pick it up, then click a terminal.</p>
+    </div>
+  </aside>
+
+  <div class="dock" id="dock"></div>
+  <div class="tip" id="tip" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+
+  <div class="overlay" id="startOv">
+    <div class="sheet">
+      <div class="lbl">ELEC-256 midterm lab · Part B practical</div>
+      <h1>Wire it, <span>meter it</span>, get it stamped.</h1>
+      <p class="muted">A bench simulator for the series-parallel practical: banana leads, a trainer board, a DC supply, a bench ammeter and a handheld DMM. Drag to orbit, scroll or pinch to zoom, WASD to move, click jacks to plug in.</p>
+      <div class="spec"><b>The circuit:</b> R1 = <b>750 Ω</b> in series with R2 = <b>3000 Ω</b>, then R3 = <b>1.5 kΩ</b> in parallel with R4 = <b>1.5 kΩ</b>. Source = <b>30 V</b>. One ammeter, measuring the current through <b>R3</b>.</div>
+      <div class="choices">
+        <button class="choice" id="goPractice"><span class="t">Practice</span><ul><li>Step-by-step guided build with highlighted jacks</li><li>Reference schematic and hints</li><li>Check your work as often as you like</li></ul></button>
+        <button class="choice" id="goExam"><span class="t">Exam</span><ul><li>Marked like the sheet: ohmmeter /8, chart /12, demonstration /8</li><li>Two wiring checks; leftover errors multiply Part B</li><li>Resistor positions on the board are shuffled</li><li>Energize before the stamp and you lose 20 marks</li></ul></button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay" id="resultOv" hidden><div class="sheet" id="resultSheet"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(()=>{
+"use strict";
+// ================= constants =================
+const SHUNT = 2.0;      // ammeter mA-input shunt, ohms
+const ILIM = 0.2;       // supply current limit, A
+const IT_N = 30/4500, IB_N = IT_N/2;
+const LEAD_COLORS = {red:'#c92f27',black:'#24272b',blue:'#2c63c9',yellow:'#dcb22a',orange:'#e7741e'};
+const BASE_VALUES = [3000,3000,1000,1000,1500,1500,750,750,10,10,2,2,250,250];
+const STAGES = [{n:'Wire',m:null},{n:'Ohmmeter',m:8},{n:'Chart',m:12},{n:'Demonstrate',m:8}];
+const $ = id=>document.getElementById(id);
+const fmtR = n=> n>=1000 ? (n/1000)+' kΩ' : n+' Ω';
+const near=(a,b,t=0.03)=>Math.abs(a-b)<=Math.abs(b)*t;
+
+// ================= state =================
+const S = {
+  mode:null, resistors:[], leads:[], nid:1,
+  probes:{red:null,black:null},
+  supply:{set:0,on:false}, bench:'DCV', hand:'OFF',
+  tool:'lead', color:'red', pending:null,
+  stage:0, step:0, sub:0,
+  scores:[null,null,null,null], details:[null,null,null,null], deductions:[],
+  stamped:false, ohmEntry:'', request:null, setAtOn:null, failed:false, t0:0,
+  flagged:{}, lastFb:null, chartVals:{}, chartMarks:{}
+};
+let R = {}; // live readings
+
+// ================= three.js scene =================
+const host = $('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc3ccd1);
+const camera = new THREE.PerspectiveCamera(40,1,0.1,200);
+camera.position.set(0,19,17);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0,0,-1); controls.enableDamping = true; controls.maxPolarAngle = 1.38; controls.minDistance = 5; controls.maxDistance = 45;
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a949a,0.75));
+const sun = new THREE.DirectionalLight(0xffffff,0.75); sun.position.set(-8,22,12); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-22,right:22,top:16,bottom:-16,near:1,far:60}); scene.add(sun);
+function resize(){ const w=host.clientWidth,h=host.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(host); resize();
+
+const mat = (c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.55,metalness:.05},o));
+const desk = new THREE.Mesh(new THREE.PlaneGeometry(90,70), mat(0xa9b3b9,{roughness:.9}));
+desk.rotation.x=-Math.PI/2; desk.position.y=-0.6; desk.receiveShadow=true; scene.add(desk);
+
+function canvasTex(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; const t=new THREE.CanvasTexture(c); t.anisotropy=4; return {c,ctx:c.getContext('2d'),t}; }
+
+// ---- trainer board
+const BW=14, BD=9.4;
+const frame = new THREE.Mesh(new THREE.BoxGeometry(BW+0.6,0.6,BD+0.6), mat(0x1c1e21,{roughness:.8}));
+frame.position.y=-0.3; frame.castShadow=true; frame.receiveShadow=true; scene.add(frame);
+const boardTex = canvasTex(1400,940);
+const boardFace = new THREE.Mesh(new THREE.PlaneGeometry(BW,BD), new THREE.MeshStandardMaterial({map:boardTex.t,roughness:.7}));
+boardFace.rotation.x=-Math.PI/2; boardFace.position.y=0.002; boardFace.receiveShadow=true; scene.add(boardFace);
+const handle = new THREE.Mesh(new THREE.TorusGeometry(1.6,0.12,8,24,Math.PI), mat(0x1c1e21));
+handle.position.set(0,-0.3,BD/2+0.35); handle.rotation.x=Math.PI/2; scene.add(handle);
+const slotPos = i=>{ const col=i<7?0:1, row=i%7; return {cx: col? 3.4:-3.6, z:-2.85+row*1.0}; };
+
+// ---- jacks
+const JACKS = []; const JIDX = {}; const JMAP = {};
+const pickJacks = [];
+const UP = new THREE.Vector3(0,1,0);
+function addJack(id,pos,normal,color){
+  const g = new THREE.Group();
+  const outer = new THREE.Mesh(new THREE.CylinderGeometry(0.29,0.31,0.3,24), mat(color,{roughness:.35}));
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.32,12), mat(0x111111));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45,0.055,8,32), new THREE.MeshBasicMaterial({color:0x2c63c9}));
+  ring.rotation.x = Math.PI/2; ring.position.y=0.12; ring.visible=false;
+  g.add(outer,inner,ring); outer.castShadow=true;
+  g.quaternion.setFromUnitVectors(UP, normal); g.position.copy(pos).addScaledVector(normal,0.15);
+  scene.add(g);
+  outer.userData.jack=id; inner.userData.jack=id; pickJacks.push(outer,inner);
+  const j={id,pos:pos.clone(),normal:normal.clone(),tip:pos.clone().addScaledVector(normal,0.3),ring,outer};
+  JIDX[id]=JACKS.length; JACKS.push(j); JMAP[id]=j; return j;
+}
+
+// ---- power supply
+const PS = {x:-11.4, z:1.4};
+const psBox = new THREE.Mesh(new THREE.BoxGeometry(5.2,3.4,3.6), mat(0x47555f,{roughness:.6}));
+psBox.position.set(PS.x,1.1,PS.z); psBox.castShadow=true; psBox.receiveShadow=true; scene.add(psBox);
+const psTex = canvasTex(500,320);
+const psFace = new THREE.Mesh(new THREE.PlaneGeometry(5.0,3.2), new THREE.MeshStandardMaterial({map:psTex.t,roughness:.6}));
+const psFrontZ = PS.z+1.8; psFace.position.set(PS.x,1.1,psFrontZ+0.003); scene.add(psFace);
+const psSwitch = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.5,0.35), mat(0x1b1d20));
+psSwitch.position.set(PS.x-1.75,0.05,psFrontZ+0.18); psSwitch.userData.psSwitch=true; scene.add(psSwitch);
+const psLamp = new THREE.Mesh(new THREE.SphereGeometry(0.12,12,12), new THREE.MeshBasicMaterial({color:0x553333}));
+psLamp.position.set(PS.x-0.7,0.15,psFrontZ+0.05); scene.add(psLamp);
+
+// ---- bench multimeter (ammeter)
+const BM = {x:1.6, z:-8.4};
+const bmBox = new THREE.Mesh(new THREE.BoxGeometry(8.4,3.2,3.8), mat(0xd9dcd8,{roughness:.6}));
+bmBox.position.set(BM.x,1.0,BM.z); bmBox.castShadow=true; bmBox.receiveShadow=true; scene.add(bmBox);
+const bmTex = canvasTex(820,300);
+const bmFrontZ = BM.z+1.9;
+const bmFace = new THREE.Mesh(new THREE.PlaneGeometry(8.2,3.0), new THREE.MeshStandardMaterial({map:bmTex.t,roughness:.5}));
+bmFace.position.set(BM.x,1.0,bmFrontZ+0.003); scene.add(bmFace);
+
+// ---- handheld DMM
+const HH = new THREE.Group(); HH.position.set(11.6,1.0,1.4); HH.rotation.x=0.42; scene.add(HH);
+const hhBody = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.7,6.0), mat(0xe2a21f,{roughness:.7})); hhBody.castShadow=true; HH.add(hhBody);
+const hhTex = canvasTex(340,560);
+const hhFace = new THREE.Mesh(new THREE.PlaneGeometry(3.3,5.6), new THREE.MeshStandardMaterial({map:hhTex.t,roughness:.6}));
+hhFace.rotation.x=-Math.PI/2; hhFace.position.y=0.352; HH.add(hhFace);
+const hhPortR = new THREE.Vector3(0.7,0.4,2.55), hhPortB = new THREE.Vector3(-0.7,0.4,2.55);
+
+// build jacks
+function buildJacks(){
+  for(let i=0;i<14;i++){ const {cx,z}=slotPos(i); addJack(`R${i+1}a`,new THREE.Vector3(cx-1.15,0,z),UP,0xb52a24); addJack(`R${i+1}b`,new THREE.Vector3(cx+1.15,0,z),UP,0xb52a24); }
+  const fz = new THREE.Vector3(0,0,1);
+  addJack('PS+',new THREE.Vector3(PS.x+0.6,0.15,psFrontZ),fz,0xc42f27);
+  addJack('PS-',new THREE.Vector3(PS.x+1.7,0.15,psFrontZ),fz,0x1d1f22);
+  addJack('AM_HI',new THREE.Vector3(BM.x+3.55,1.95,bmFrontZ),fz,0xc42f27);
+  addJack('AM_LO',new THREE.Vector3(BM.x+3.55,1.05,bmFrontZ),fz,0x1d1f22);
+  addJack('AM_mA',new THREE.Vector3(BM.x+3.55,0.15,bmFrontZ),fz,0xc42f27);
+}
+buildJacks();
+
+// ---- drawing static/dynamic faces
+function drawBoard(){
+  const {ctx,c}=boardTex; const px=x=>(x+BW/2)*100, pz=z=>(z+BD/2)*100;
+  ctx.fillStyle='#f3f4f1'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='#1c1e21'; ctx.lineWidth=6; ctx.strokeRect(22,22,c.width-44,c.height-44);
+  ctx.fillStyle='#1c1e21'; ctx.font='600 34px "Barlow Condensed", sans-serif'; ctx.textBaseline='middle';
+  ctx.fillText('RESISTOR TRAINER  ·  EB-100',50,62);
+  ctx.font='500 22px "IBM Plex Mono", monospace'; ctx.textAlign='right'; ctx.fillText('¼ W  ±2 %',c.width-50,62); ctx.textAlign='left';
+  ctx.fillRect(40,92,c.width-80,3);
+  for(let i=0;i<14;i++){
+    const r=S.resistors[i]; const {cx,z}=slotPos(i); const x0=px(cx-0.8), x1=px(cx+0.8), y=pz(z);
+    ctx.strokeStyle='#1c1e21'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x0,y);
+    const n=8, seg=(x1-x0-40)/n; ctx.lineTo(x0+20,y); for(let k=0;k<n;k++) ctx.lineTo(x0+20+seg*(k+.5), y+(k%2?14:-14)); ctx.lineTo(x1-20,y); ctx.lineTo(x1,y); ctx.stroke();
+    ctx.fillStyle='#1c1e21'; ctx.textAlign='center';
+    ctx.font='700 28px "Barlow Condensed", sans-serif'; ctx.fillText(r?r.name:'',px(cx),y-34);
+    ctx.font='500 22px "IBM Plex Mono", monospace'; ctx.fillText(r?fmtR(r.nom):'',px(cx),y+36);
+    ctx.textAlign='left';
+  }
+  boardTex.t.needsUpdate=true;
+}
+function drawPS(){
+  const {ctx,c}=psTex; ctx.fillStyle='#d6d9d6'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#2a2f34'; ctx.font='600 26px "Barlow Condensed", sans-serif'; ctx.textBaseline='middle'; ctx.fillText('DC POWER SUPPLY  0–30 V / 0.2 A',20,28);
+  ctx.fillStyle='#1d1414'; ctx.fillRect(20,52,460,120);
+  ctx.fillStyle='#ff5a3c'; ctx.font='500 64px "IBM Plex Mono", monospace'; ctx.textAlign='right';
+  ctx.fillText((R.psV??0).toFixed(1),230,112); ctx.fillText((R.psI??0).toFixed(3),440,112);
+  ctx.font='500 22px "IBM Plex Mono", monospace'; ctx.fillText('V',258,130); ctx.fillText('A',468,130); ctx.textAlign='left';
+  ctx.fillStyle=R.cc?'#ffb000':'#553a33'; ctx.fillText(R.cc?'CC':'CV',30,155);
+  ctx.fillStyle='#2a2f34'; ctx.font='600 22px "Barlow Condensed", sans-serif';
+  ctx.fillText('POWER',36,212); ctx.fillText(S.supply.on?'ON':'OFF',52,300);
+  ctx.fillText('+',304,200); ctx.fillText('−',414,200); ctx.fillText('OUTPUT',320,300);
+  psTex.t.needsUpdate=true;
+}
+function drawBM(){
+  const {ctx,c}=bmTex; ctx.fillStyle='#e4e6e2'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#e07a1a'; ctx.fillRect(20,16,120,30); ctx.fillStyle='#1b1d20'; ctx.font='700 22px "Barlow Condensed", sans-serif'; ctx.textBaseline='middle'; ctx.fillText('BENCH DMM',28,32);
+  ctx.font='500 20px "Barlow Condensed", sans-serif'; ctx.fillText('6½ DIGIT PRECISION MULTIMETER',152,32);
+  ctx.fillStyle='#0b1f21'; ctx.fillRect(20,58,560,170);
+  ctx.fillStyle='#5fe3d8'; ctx.font='500 66px "IBM Plex Mono", monospace'; ctx.textAlign='right'; ctx.fillText(R.benchTxt||'0.000000',470,140);
+  ctx.textAlign='left'; ctx.font='500 40px "IBM Plex Mono", monospace'; ctx.fillText(S.bench==='DCI'?'A⎓':'V⎓',486,142);
+  ctx.font='500 20px "IBM Plex Mono", monospace'; ctx.fillText(S.bench,36,80);
+  ctx.fillStyle='#1b1d20'; ctx.font='600 22px "Barlow Condensed", sans-serif';
+  ctx.fillText('HI  V/Ω',612,56); ctx.fillText('LO  COM',612,146); ctx.fillText('mA  400 mA',612,236);
+  ctx.strokeStyle='#9aa0a4'; ctx.lineWidth=2; ctx.strokeRect(598,14,206,272);
+  ['DCV','ACV','DCI','ACI','Ω'].forEach((b,i)=>{ctx.fillStyle=(b===S.bench)?'#1b1d20':'#5d656b'; ctx.fillRect(30+i*112,245,96,36); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(b,78+i*112,264); ctx.textAlign='left';});
+  bmTex.t.needsUpdate=true;
+}
+function drawHH(){
+  const {ctx,c}=hhTex; ctx.fillStyle='#e2a21f'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#2b2b2b'; ctx.fillRect(14,14,c.width-28,c.height-28);
+  ctx.fillStyle='#b7c2b3'; ctx.fillRect(34,40,272,130);
+  ctx.fillStyle='#16201a'; ctx.font='500 54px "IBM Plex Mono", monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillText(R.handTxt||'',290,100); ctx.font='500 24px "IBM Plex Mono", monospace'; ctx.fillText(R.handUnit||'',290,148);
+  ctx.textAlign='center'; ctx.fillStyle='#d8d8d8'; ctx.font='600 26px "Barlow Condensed", sans-serif'; ctx.fillText('HANDHELD DMM',170,205);
+  // dial
+  ctx.strokeStyle='#888'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(170,330,74,0,Math.PI*2); ctx.stroke();
+  const pos={OFF:-2.4,V:-1.57,OHM:-0.74}; ['OFF','V','OHM'].forEach(k=>{const a=pos[k]; ctx.fillStyle=S.hand===k?'#ffd34d':'#d8d8d8'; ctx.font='600 24px "Barlow Condensed", sans-serif'; ctx.fillText(k==='V'?'V⎓':k==='OHM'?'Ω':'OFF',170+Math.cos(a)*104,330+Math.sin(a)*104);});
+  const a=pos[S.hand]; ctx.strokeStyle='#ffd34d'; ctx.lineWidth=10; ctx.beginPath(); ctx.moveTo(170,330); ctx.lineTo(170+Math.cos(a)*62,330+Math.sin(a)*62); ctx.stroke();
+  ctx.fillStyle='#c42f27'; ctx.beginPath(); ctx.arc(240,490,24,0,7); ctx.fill(); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(100,490,24,0,7); ctx.fill();
+  ctx.fillStyle='#d8d8d8'; ctx.font='500 20px "IBM Plex Mono", monospace'; ctx.fillText('VΩ',240,530); ctx.fillText('COM',100,530);
+  hhTex.t.needsUpdate=true;
+}
+
+// ================= leads / probes meshes =================
+const leadGroup = new THREE.Group(); scene.add(leadGroup);
+const probeGroup = new THREE.Group(); scene.add(probeGroup);
+const PLUG_H = 0.46;
+function stackAt(id){ const arr=[]; for(const L of S.leads){ if(L.a===id) arr.push([L,'a']); if(L.b===id) arr.push([L,'b']); } return arr; }
+function disposeGroup(g){ while(g.children.length){ const o=g.children.pop(); o.traverse(m=>{ if(m.geometry) m.geometry.dispose(); }); } }
+function rebuildLeads(){
+  disposeGroup(leadGroup);
+  const endPts = {};
+  const counts = {};
+  for(const L of S.leads){
+    for(const end of ['a','b']){
+      const id=L[end], j=JMAP[id]; const k=counts[id]||0; counts[id]=k+1;
+      const col = new THREE.Color(LEAD_COLORS[L.color]);
+      const plug = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.22,PLUG_H,16), mat(col,{roughness:.4}));
+      plug.quaternion.setFromUnitVectors(UP,j.normal);
+      plug.position.copy(j.tip).addScaledVector(j.normal, PLUG_H/2 + k*PLUG_H);
+      plug.castShadow=true; plug.userData={jack:id, lead:L.id}; leadGroup.add(plug);
+      endPts[L.id+end] = {p:j.tip.clone().addScaledVector(j.normal,(k+1)*PLUG_H), n:j.normal};
+    }
+  }
+  for(const L of S.leads){
+    const A=endPts[L.id+'a'], B=endPts[L.id+'b'];
+    const d=A.p.distanceTo(B.p);
+    const a1=A.p.clone().addScaledVector(A.n,0.5).add(new THREE.Vector3(0,0.2,0));
+    const b1=B.p.clone().addScaledVector(B.n,0.5).add(new THREE.Vector3(0,0.2,0));
+    const mid=a1.clone().add(b1).multiplyScalar(.5); mid.y+=0.5+d*0.16;
+    const curve=new THREE.CatmullRomCurve3([A.p,a1,mid,b1,B.p]);
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,48,0.075,8,false), mat(LEAD_COLORS[L.color],{roughness:.45}));
+    tube.castShadow=true; tube.userData={lead:L.id}; leadGroup.add(tube);
+  }
+  $('leadCount').textContent = S.leads.length+' lead'+(S.leads.length===1?'':'s');
+}
+let probeMeshes=[];
+function rebuildProbes(){
+  disposeGroup(probeGroup); probeMeshes=[];
+  HH.updateMatrixWorld(true);
+  [['red','#c42f27',hhPortR,new THREE.Vector3(7.6,-0.45,-5.45)],['black','#24272b',hhPortB,new THREE.Vector3(7.6,-0.45,-6.05)]].forEach(([k,col,port,rest])=>{
+    const id=S.probes[k]; const g=new THREE.Group();
+    const heldNow=S.held===k;
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,1.6,12), mat(col,heldNow?{emissive:0x2c63c9,emissiveIntensity:.55}:{})); body.position.y=1.0;
+    const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.05,0.4,8), mat(0xcfd3d6,{metalness:.8,roughness:.3})); tip.position.y=0.05;
+    const guard=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.06,12), mat(col)); guard.position.y=0.3;
+    g.add(body,tip,guard); body.castShadow=true;
+    const hit=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,2.0,8), new THREE.MeshBasicMaterial({visible:false})); hit.position.y=0.9; g.add(hit);
+    [body,tip,guard,hit].forEach(m=>{ m.userData.probe=k; probeMeshes.push(m); });
+    let top;
+    if(id){
+      const j=JMAP[id]; const k2=stackAt(id).length;
+      g.quaternion.setFromUnitVectors(UP,j.normal);
+      g.position.copy(j.tip).addScaledVector(j.normal,0.05+k2*PLUG_H);
+      top=g.position.clone().addScaledVector(j.normal,1.8);
+    } else if(heldNow){
+      g.position.copy(rest).add(new THREE.Vector3(-0.9,1.6,0)); top=g.position.clone().add(new THREE.Vector3(0,1.8,0));
+    } else {
+      g.rotation.z=Math.PI/2; g.position.copy(rest); top=rest.clone().add(new THREE.Vector3(-1.8,0,0));
+    }
+    probeGroup.add(g);
+    const pw=HH.localToWorld(port.clone());
+    const mid=top.clone().add(pw).multiplyScalar(.5); mid.y+=1.2;
+    const curve=new THREE.CatmullRomCurve3([top, top.clone().add(new THREE.Vector3(0,0.6,0)), mid, pw]);
+    const w=new THREE.Mesh(new THREE.TubeGeometry(curve,40,0.05,6,false), mat(col)); w.userData.probe=k; probeMeshes.push(w); probeGroup.add(w);
+  });
+}
+
+// ================= circuit solver =================
+function gauss(A,b){ const n=b.length;
+  for(let c=0;c<n;c++){ let p=c; for(let r=c+1;r<n;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r;
+    if(p!==c){ const t=A[c];A[c]=A[p];A[p]=t; const tb=b[c];b[c]=b[p];b[p]=tb; }
+    const d=A[c][c]; if(Math.abs(d)<1e-30) continue;
+    for(let r=c+1;r<n;r++){ const f=A[r][c]/d; if(!f) continue; for(let k=c;k<n;k++) A[r][k]-=f*A[c][k]; b[r]-=f*b[c]; } }
+  const x=new Float64Array(n); for(let r=n-1;r>=0;r--){ let s=b[r]; for(let k=r+1;k<n;k++) s-=A[r][k]*x[k]; x[r]=A[r][r]?s/A[r][r]:0; } return x; }
+function solve(o){
+  const N=JACKS.length, g=JIDX['PS-'];
+  const A=[]; for(let i=0;i<N;i++) A.push(new Float64Array(N)); const b=new Float64Array(N);
+  const st=(i,j,y)=>{ if(i===j) return; A[i][i]+=y; A[j][j]+=y; A[i][j]-=y; A[j][i]-=y; };
+  for(const L of S.leads) st(JIDX[L.a],JIDX[L.b],1000);
+  for(const r of S.resistors) st(JIDX[r.a],JIDX[r.b],1/(o.nominal?r.nom:r.act));
+  st(JIDX.AM_mA,JIDX.AM_LO,1/(o.shunt||SHUNT));
+  st(JIDX.AM_HI,JIDX.AM_LO,1e-7);
+  if(o.handLoad && S.probes.red && S.probes.black) st(JIDX[S.probes.red],JIDX[S.probes.black],1e-7);
+  for(let i=0;i<N;i++) A[i][i]+=1e-9;
+  if(o.on){ const y=50; st(JIDX['PS+'],g,y); b[JIDX['PS+']]+=o.V*y; b[g]-=o.V*y; }
+  if(o.inject){ b[JIDX[o.inject[0]]]+=1e-3; b[JIDX[o.inject[1]]]-=1e-3; }
+  for(let j=0;j<N;j++) A[g][j]=0; A[g][g]=1; b[g]=0;
+  const x=gauss(A,b);
+  let Isup=o.on?(o.V-(x[JIDX['PS+']]-x[g]))*50:0, cc=false;
+  if(o.on && o.limit!==false && Isup>ILIM){ const k=ILIM/Isup; for(let i=0;i<N;i++) x[i]*=k; Isup=ILIM; cc=true; }
+  return {x, v:id=>x[JIDX[id]], Isup, cc};
+}
+// union-find over leads
+let UF={};
+function buildUF(){ UF={}; for(const j of JACKS) UF[j.id]=j.id; const f=a=>{ while(UF[a]!==a){ UF[a]=UF[UF[a]]; a=UF[a]; } return a; }; for(const L of S.leads){ UF[f(L.a)]=f(L.b); } UF._f=f; }
+const node=id=>UF._f(id);
+const same=(a,b)=>node(a)===node(b);
+
+// ================= live readings =================
+function recompute(){
+  buildUF();
+  const sol=solve({on:S.supply.on, V:S.supply.set, handLoad:S.hand==='V'});
+  R.sol=sol; R.cc=sol.cc;
+  R.psV = S.supply.on ? (sol.cc ? sol.v('PS+')-sol.v('PS-') : S.supply.set) : 0;
+  R.psI = sol.Isup;
+  const Ia=(sol.v('AM_mA')-sol.v('AM_LO'))/SHUNT; R.Ia=Ia;
+  if(S.bench==='DCI'){ R.benchVal=Ia; R.benchTxt=Ia.toFixed(6); }
+  else { const v=sol.v('AM_HI')-sol.v('AM_LO'); R.benchVal=v; R.benchTxt=v.toFixed(5); }
+  // handheld
+  R.handVal=null; R.handTxt=''; R.handUnit='';
+  const pr=S.probes.red, pb=S.probes.black;
+  if(S.hand==='V'){
+    const v = (pr&&pb)? sol.v(pr)-sol.v(pb) : 0; R.handVal=v;
+    R.handTxt = Math.abs(v)<10? v.toFixed(3) : v.toFixed(2); R.handUnit='V DC';
+  } else if(S.hand==='OHM'){
+    R.handUnit='Ω';
+    if(S.supply.on){ R.handTxt='LIVE'; R.handUnit='err'; if(pr&&pb) flagOnce('liveOhm','Measured resistance on an energized circuit (meter error, safety violation).',1); }
+    else if(!(pr&&pb)){ R.handTxt='0L'; R.handUnit='MΩ'; }
+    else {
+      const s2=solve({on:false,inject:[pr,pb]}); const Rm=(s2.v(pr)-s2.v(pb))/1e-3;
+      if(Rm>40e6||Rm<0){ R.handTxt='0L'; R.handUnit='MΩ'; R.handVal=Infinity; }
+      else if(Rm<1000){ R.handTxt=Rm.toFixed(1); R.handUnit='Ω'; R.handVal=+Rm.toFixed(1); }
+      else if(Rm<1e6){ R.handTxt=(Rm/1000).toFixed(3); R.handUnit='kΩ'; R.handVal=+(Rm/1000).toFixed(3)*1000; }
+      else { R.handTxt=(Rm/1e6).toFixed(3); R.handUnit='MΩ'; R.handVal=+(Rm/1e6).toFixed(3)*1e6; }
+    }
+  }
+  if(sol.cc && S.supply.on) flagOnce('short','Supply went into current limit: a short or near-short across the supply while energized.',2);
+  updateHud(); drawPS(); drawBM(); drawHH();
+  if(S.mode==='practice') checkPracticeStep();
+}
+function flagOnce(key,text,pts){
+  if(S.flagged[key]) return; S.flagged[key]=true;
+  if(S.mode==='exam'){ S.deductions.push({text,pts}); toast(`Safety: ${text} −${pts}`,'bad'); }
+  else toast(`Careful: ${text}`,'bad');
+}
+
+// ================= analysis / grading =================
+function analyze(){
+  buildUF();
+  const s=solve({nominal:true,on:true,V:30,limit:false}); const v=s.v;
+  const res={Isup:s.Isup, short:s.Isup>ILIM};
+  const I=r=>(v(r.a)-v(r.b))/r.nom;
+  const active=S.resistors.filter(r=>Math.abs(I(r))>2e-5);
+  res.active=active;
+  res.valsOk = active.map(r=>r.nom).sort((a,b)=>a-b).join(',')==='750,1500,1500,3000';
+  const Ia=(v('AM_mA')-v('AM_LO'))/SHUNT; res.Ia=Ia;
+  if(Math.abs(Ia)<2e-5) res.amm='none'; else if(near(Ia,IB_N)) res.amm='ok'; else if(near(Ia,-IB_N)) res.amm='reversed'; else if(near(Math.abs(Ia),IT_N)) res.amm='total'; else res.amm='other';
+  res.currentsOk=false; res.orderOk=false;
+  if(res.valsOk && !res.short){
+    const r750=active.find(r=>r.nom===750), r3k=active.find(r=>r.nom===3000), p=active.filter(r=>r.nom===1500);
+    res.currentsOk = near(Math.abs(I(r750)),IT_N)&&near(Math.abs(I(r3k)),IT_N)&&p.every(r=>near(Math.abs(I(r)),IB_N))&&near(s.Isup,IT_N);
+    const hi=r=>v(r.a)>=v(r.b)?r.a:r.b, lo=r=>v(r.a)>=v(r.b)?r.b:r.a;
+    res.orderOk = res.currentsOk && same(hi(r750),'PS+') && same(hi(r3k),lo(r750));
+    let r3=p[0], r4=p[1];
+    if(res.amm==='ok'||res.amm==='reversed'){ const s2=solve({nominal:true,on:true,V:30,shunt:1000,limit:false}); const I2=r=>Math.abs((s2.v(r.a)-s2.v(r.b))/r.nom); if(I2(p[1])<I2(p[0])){ r3=p[1]; r4=p[0]; } }
+    if(res.currentsOk) res.roles={R1:r750,R2:r3k,R3:r3,R4:r4};
+  }
+  // lead checks
+  res.stackBad = JACKS.filter(j=>stackAt(j.id).length>2).map(j=>j.id);
+  const plusLeads=S.leads.filter(L=>L.a==='PS+'||L.b==='PS+'), minusLeads=S.leads.filter(L=>L.a==='PS-'||L.b==='PS-');
+  res.colorsOk = plusLeads.length>0 && minusLeads.length>0 && plusLeads.every(L=>L.color==='red') && minusLeads.every(L=>L.color==='black');
+  res.idle = S.leads.filter(L=>Math.abs((v(L.a)-v(L.b))*1000)<1e-6);
+  return res;
+}
+function gradeWiring(){
+  const a=analyze(); const items=[]; const add=(label,ok,note)=>items.push({label,st:ok?'ok':'no',note});
+  let topoOk=false, note;
+  if(a.short) note='Short circuit across the supply. The supply would go straight into current limit.';
+  else if(!S.leads.length) note='Nothing is wired yet.';
+  else if(!a.valsOk){ const got=a.active.map(r=>`${r.name} (${fmtR(r.nom)})`).join(', ')||'none'; note=`Wrong resistors carry current. Expected 750 Ω, 3 kΩ, 1.5 kΩ, 1.5 kΩ. Found: ${got}.`; }
+  else if(!a.currentsOk) note='Right resistors, wrong arrangement. R1 and R2 must be in series, R3 and R4 in parallel with each other.';
+  else if(!a.orderOk) note='Circuit works but not in the given sequence: + → R1 (750 Ω) → R2 (3 kΩ) → R3 ∥ R4 → −.';
+  else { topoOk=true; note='Series-parallel network correct and in sequence.'; }
+  add('Circuit & sequence',topoOk,note);
+  const amMsg={ok:'Ammeter in series with R3 only, correct polarity (current into mA, out of COM).',reversed:'Ammeter in R3 branch but polarity reversed (reads negative). Current must enter the mA jack.',total:'Ammeter is measuring total current, not R3 only.',none:'No current through the ammeter. It must be in series with R3.',other:'Ammeter is in the wrong place.'};
+  const ammOk=a.currentsOk&&a.amm==='ok';
+  add('Ammeter on R3, correct polarity',ammOk,(!a.currentsOk&&a.amm==='ok')?'Ammeter is wired but the rest of the circuit is wrong.':amMsg[a.short?'other':a.amm]);
+  add('Supply lead colours',a.colorsOk,a.colorsOk?'Red from +, black from −.':'Leads from the supply must be red on + and black on −.');
+  add('Max 2 banana plugs per jack',!a.stackBad.length,a.stackBad.length?`Too many plugs stacked on ${a.stackBad.map(jackName).join(', ')}.`:'No jack has more than 2 plugs.');
+  const idleOk=!a.idle.length&&S.leads.length>0;
+  add('No loose or exposed leads',idleOk,idleOk?'Every lead is part of the circuit.':(S.leads.length?`${a.idle.length} lead(s) carry no current (exposed/unneeded). Remove them.`:'No leads.'));
+  const errors=items.filter(i=>i.st!=='ok').length;
+  const working=!a.short&&a.currentsOk&&(a.amm==='ok'||a.amm==='reversed');
+  return {items,errors,working,a};
+}
+const multFor=e=>e<=0?1:e===1?0.8:e===2?0.5:0.1;
+function gradeOhm(entry){
+  const items=[]; const reading=R.handVal;
+  const valid = S.hand==='OHM' && !S.supply.on && S.probes.red && S.probes.black && isFinite(reading) && reading!=null;
+  const across = valid && near(reading,4500+SHUNT*0,0.03);
+  items.push({label:'Ohmmeter connected across the whole circuit',pts:across?4:0,max:4,note:!valid?(S.supply.on?'Supply must be OFF to measure resistance.':S.hand!=='OHM'?'Handheld DMM is not on Ω.':'Probes are not giving a valid reading.'):across?`Meter reads ${R.handTxt} ${R.handUnit}, total resistance of the network.`:`Meter reads ${R.handTxt} ${R.handUnit}. That is not R_T (≈ 4.5 kΩ). Probe across the points where the supply connects.`});
+  const e=parseFloat(String(entry).replace(/[, ]/g,''));
+  const recOk = valid && isFinite(e) && Math.abs(e-reading)<=Math.max(1,reading*0.005);
+  items.push({label:'Reading recorded correctly in ohms',pts:recOk?4:0,max:4,note:!isFinite(e)?'No value entered.':recOk?`${e} Ω recorded.`:(valid?`Entered ${e} Ω, meter shows ${Math.round(reading)} Ω. Watch kΩ vs Ω.`:'Record the value the meter actually shows.')});
+  return {items, score:items.reduce((s,i)=>s+i.pts,0)};
+}
+const UNITS={R:[['Ω',1],['kΩ',1e3],['MΩ',1e6]],V:[['V',1],['mV',1e-3]],I:[['mA',1e-3],['A',1],['µA',1e-6]]};
+const COLS=['R1','R2','R3','R4'];
+const ROWS=[{r:'R',lab:'Resistance',tot:'R<sub>T</sub>',marks:5},{r:'V',lab:'Voltage',tot:'E<sub>T</sub>',marks:2},{r:'I',lab:'Current',tot:'I<sub>T</sub>',marks:5}];
+const cellName=k=>{const [r,c]=k.split('_'); if(c==='T') return {R:'RT',V:'ET',I:'IT'}[r]; return r==='R'?c:r+c;};
+function cellRaw(k){ return S.chartVals[k]||{v:'',u:UNITS[k[0]][0][0]}; }
+function cellVal(k){ const c=cellRaw(k); if(String(c.v).trim()==='') return NaN; const m=UNITS[k[0]].find(x=>x[0]===c.u)||UNITS[k[0]][0]; return parseFloat(String(c.v).replace(',','.'))*m[1]; }
+function truthAll(){
+  const a=analyze(); const roles=a.roles||S.roles; if(!roles) return null;
+  const V=S.supply.set>0?S.supply.set:30; const s=solve({on:true,V}); const t={roles};
+  for(const k of COLS){ const r=roles[k]; const dv=Math.abs(s.v(r.a)-s.v(r.b)); t['R_'+k]=r.act; t['V_'+k]=dv; t['I_'+k]=dv/r.act; }
+  const so=solve({on:false,inject:['PS+','PS-']}); t.R_T=(so.v('PS+')-so.v('PS-'))/1e-3;
+  t.V_T=s.cc?s.v('PS+')-s.v('PS-'):V; t.I_T=s.Isup; t.Ia=(s.v('AM_mA')-s.v('AM_LO'))/SHUNT;
+  return t;
+}
+function liveTruth(){ const t=truthAll(); if(!t) return null; return {R1:t.V_R1,R2:t.V_R2,R3:t.V_R3,R4:t.V_R4,I3:t.Ia*1000,roles:t.roles}; }
+function gradeChart(){
+  const t=truthAll(); const marks={}; const items=[]; const prefix=[];
+  const tol={R:0.01,V:0.015,I:0.015};
+  for(const row of ROWS){
+    const keys=[...COLS.map(c=>row.r+'_'+c),row.r+'_T']; const bad=[]; let ok=0;
+    for(const k of keys){
+      const v=cellVal(k); let good=false;
+      if(t&&isFinite(v)){ const tv=t[k]; good=tv>0&&Math.abs(v-tv)<=Math.max(tv*tol[row.r],row.r==='V'?0.01:0); if(k==='V_T'&&Math.abs(t.V_T-30)>0.2) good=false; }
+      marks[k]=good; if(good) ok++; else bad.push(cellName(k));
+      const raw=parseFloat(cellRaw(k).v); if(isFinite(raw)&&raw!==0&&(Math.abs(raw)>=1000||Math.abs(raw)<1)) prefix.push(`${raw} ${cellRaw(k).u} (${cellName(k)})`);
+    }
+    let note=t?(bad.length?`${ok} of 5 correct. Check ${bad.join(', ')}.`:'All 5 values match the meters.'):'Circuit is not wired as specified, so values cannot be checked.';
+    if(row.r==='V'&&t&&Math.abs(t.V_T-30)>0.2) note+=` Supply is at ${t.V_T.toFixed(1)} V, not 30 V.`;
+    items.push({label:`${row.lab} row`,pts:+(ok*row.marks/5).toFixed(2),max:row.marks,note});
+  }
+  S.chartMarks=marks;
+  if(prefix.length) items.push({label:'SI prefixes',st:'info',note:`${prefix.join(', ')}. Values read better with a prefix that keeps the number between 1 and 999 (4.497 kΩ, 3.33 mA). Not deducted here.`});
+  return {items,score:items.reduce((s,i)=>s+(i.pts||0),0)};
+}
+function gradeShow(){
+  const items=[]; const truth=liveTruth(); const role=S.request;
+  S.demoRec={mA:S.bench==='DCI'?R.benchVal*1000:null,V:S.hand==='V'?R.handVal:null};
+  let vOk=false,vNote='';
+  if(!truth) vNote='Circuit not wired as specified.';
+  else if(!S.supply.on) vNote='Circuit is not energized.';
+  else if(S.hand!=='V') vNote='Handheld DMM must be on V⎓.';
+  else { const t=truth[role]; const r=R.handVal; vOk=near(r,t,0.02); vNote=vOk?`Showing ${r.toFixed(3)} V across ${role}.`:(near(-r,t,0.02)?`Probes reversed: meter shows ${r.toFixed(3)} V. Red goes on the + end of ${role}.`:`Meter shows ${(r||0).toFixed(3)} V; ${role} is about ${t.toFixed(2)} V. Check probe placement.`); }
+  items.push({label:`Voltage across ${role}`,pts:vOk?4:0,max:4,note:vNote});
+  let iOk=false,iNote='';
+  if(!truth) iNote='Circuit not wired as specified.';
+  else if(!S.supply.on) iNote='Circuit is not energized.';
+  else if(S.bench!=='DCI') iNote='Bench meter must be on DCI to read current.';
+  else { const t=Math.abs(truth.I3)/1000; iOk=R.benchVal>0&&near(R.benchVal,t,0.02); iNote=iOk?`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA through R3.`:(near(-R.benchVal,t,0.02)?'Ammeter reads negative: polarity reversed. Current must enter the mA jack.':`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA; expected about ${(t*1000).toFixed(3)} mA.`); }
+  items.push({label:'I<sub>R3</sub> on the ammeter',pts:iOk?4:0,max:4,note:iNote});
+  return {items,score:items.reduce((s,i)=>s+i.pts,0)};
+}
+
+// ================= practice tutorial =================
+function chain(){
+  const rs=v=>S.resistors.filter(r=>r.nom===v);
+  const out=(r,n)=>same(r.a,n)?r.b:r.a;
+  const res={k:0};
+  const r1=rs(750).find(r=>same(r.a,'PS+')||same(r.b,'PS+')); if(!r1) return res; res.r1=r1; res.k=1;
+  const n1=out(r1,'PS+'); res.r1out=n1;
+  const r2=rs(3000).find(r=>same(r.a,n1)||same(r.b,n1)); if(!r2) return res; res.r2=r2; res.k=2;
+  const n2=out(r2,n1); res.r2out=n2;
+  const par=rs(1500).filter(r=>same(r.a,n2)||same(r.b,n2)); if(par.length<1) return res; res.p=par; res.k=3;
+  if(par.length<2) return res; res.k=4;
+  const far=r=>out(r,n2);
+  const withMA=par.find(r=>same(far(r),'AM_mA')); if(!withMA) return res; res.r3=withMA; res.k=5;
+  const other=par.find(r=>r!==withMA); res.r4=other;
+  if(!same('AM_LO',far(other))) return res; res.k=6;
+  if(!same(far(other),'PS-')) return res; res.k=7; return res;
+}
+function firstOf(v,skip=[]){ return S.resistors.find(r=>r.nom===v && !skip.includes(r)); }
+function endIn(r,n){ return same(r.a,n)?r.a:r.b; }
+const hintSlots=()=>{const a=firstOf(1500);return {R1:firstOf(750),R2:firstOf(3000),R3:a,R4:firstOf(1500,[a])};};
+const PSTEPS = [
+  {st:0,t:'Get oriented',body:()=>`<p>Drag to orbit the bench, scroll or pinch to zoom, and use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move around (<kbd>Q</kbd>/<kbd>E</kbd> down/up, hold <kbd>Shift</kbd> to go faster). Click a jack, then another jack, to run a banana lead between them. Hover a jack to see its name.</p><p>The trainer board labels its own resistors R1–R14. Those are <b>board</b> labels. Your <b>circuit</b> R1 is whichever 750 Ω you pick.</p><p class="hint">Keys: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move, <kbd>Q</kbd>/<kbd>E</kbd> down/up, <kbd>1</kbd>–<kbd>5</kbd> lead colour, <kbd>L</kbd> lead tool, <kbd>X</kbd> remove tool, <kbd>Esc</kbd> cancel.</p>`,next:true},
+  {st:0,t:'Measure each resistor first',chart:true,body:()=>{const h=hintSlots();return `<p>The sheet says to measure each resistor <b>before</b> you build. Set the handheld DMM to <b>Ω</b>, put the probes across a resistor's two jacks, and record the reading in the chart's <b>Resistance</b> row.</p><p>Use board <b>${h.R1.name}</b> as circuit R1, <b>${h.R2.name}</b> as R2, <b>${h.R3.name}</b> as R3 and <b>${h.R4.name}</b> as R4.</p><p class="hint">Measure out of circuit. Once wired, R3 reads in parallel with R4 (about 750 Ω). Pick the unit beside each box: 1.507 kΩ and 1507 Ω are both accepted. The step completes when all four match.</p>`},hl:()=>{const h=hintSlots();return Object.values(h).flatMap(r=>[r.a,r.b])},done:()=>{const h=hintSlots();return COLS.every(k=>near(cellVal('R_'+k),h[k].act,0.01))}},
+  {st:0,t:'Supply + to R1 (750 Ω)',body:()=>{const r=firstOf(750);return `<p>Pick the <b>red</b> lead. Connect <b>Supply +</b> to the left jack of board <b>${r.name}</b> (750 Ω). The supply stays OFF the whole time you wire.</p>`},hl:()=>['PS+',firstOf(750).name+'a'],done:()=>chain().k>=1 && S.leads.filter(L=>L.a==='PS+'||L.b==='PS+').every(L=>L.color==='red')},
+  {st:0,t:'R1 in series with R2 (3 kΩ)',body:()=>{const c=chain();return `<p>Any colour except red/black is good for jumpers (blue is common). Connect the other end of ${c.r1?c.r1.name:'R1'} to one end of a <b>3 kΩ</b> resistor, e.g. board <b>${firstOf(3000).name}</b>.</p>`},hl:()=>{const c=chain();return c.r1?[c.r1out,firstOf(3000).name+'a']:[]},done:()=>chain().k>=2},
+  {st:0,t:'R2 into the parallel pair',body:()=>{const c=chain();const a=firstOf(1500);return `<p>Connect the free end of ${c.r2?c.r2.name:'the 3 kΩ'} to a <b>1.5 kΩ</b> resistor, e.g. <b>${a.name}</b>. This one becomes your circuit <b>R3</b>.</p>`},hl:()=>{const c=chain();return c.r2?[c.r2out,firstOf(1500).name+'a']:[]},done:()=>chain().k>=3},
+  {st:0,t:'Put R4 in parallel',body:()=>{const c=chain();const b=firstOf(1500,c.p||[]);return `<p>Jumper from the top of ${c.p?c.p[0].name:'R3'} to the matching end of the second 1.5 kΩ (<b>${b?b.name:'—'}</b>). Stacking a second plug on a jack is fine; <b>2 per jack is the limit</b>.</p>`},hl:()=>{const c=chain();if(!c.p)return[];const b=firstOf(1500,c.p);return [endIn(c.p[0],c.r2out),b?b.name+'a':null]},done:()=>chain().k>=4},
+  {st:0,t:'Ammeter in series with R3',body:()=>{const c=chain();return `<p>An ammeter goes <b>in series</b>, so it breaks into R3's branch. Run a <b>red</b> lead from the free end of <b>${c.p?c.p[0].name:'R3'}</b> to the bench meter's <b>mA</b> jack. Current must flow <i>into</i> mA.</p>`},hl:()=>{const c=chain();if(!c.p)return['AM_mA'];const r=c.p[0];return [same(r.a,c.r2out)?r.b:r.a,'AM_mA']},done:()=>chain().k>=5},
+  {st:0,t:'Meter COM to the bottom node',body:()=>{const c=chain();return `<p>Black lead from the meter's <b>LO (COM)</b> jack to the free end of <b>${c.r4?c.r4.name:'R4'}</b>. That joins R3's branch back to R4 at the bottom node.</p>`},hl:()=>{const c=chain();if(!c.r4)return['AM_LO'];const r=c.r4;return ['AM_LO',same(r.a,c.r2out)?r.b:r.a]},done:()=>chain().k>=6},
+  {st:0,t:'Return to Supply −',body:()=>{const c=chain();return `<p><b>Black</b> lead from that same bottom node (free end of ${c.r4?c.r4.name:'R4'}) to <b>Supply −</b>. That jack now holds 2 plugs, the maximum.</p>`},hl:()=>{const c=chain();if(!c.r4)return['PS-'];const r=c.r4;return [same(r.a,c.r2out)?r.b:r.a,'PS-']},done:()=>chain().k>=7 && S.leads.filter(L=>L.a==='PS-'||L.b==='PS-').every(L=>L.color==='black')},
+  {st:0,t:'Call the instructor',body:()=>`<p>Press <b>Call instructor</b> below. In the exam you get two attempts. On the first, errors are pointed out and you can fix them. On the second, if the circuit still doesn't work as outlined, the test is over.</p><p class="hint">Errors still there at the second check multiply your whole Part B mark: 1 error ×0.8, 2 errors ×0.5, more ×0.1. Checked: circuit & sequence, ammeter on R3 with polarity, supply lead colours, ≤2 plugs per jack, no loose leads.</p>`,action:'wire'},
+  {st:1,t:'Measure total resistance',body:()=>`<p>Supply stays <b>OFF</b>. Set the handheld DMM to <b>Ω</b>. Put the <b>red probe</b> on the Supply + jack and the <b>black probe</b> on Supply −. With the supply off and open, the meter sees the whole network.</p><p class="hint">Expected: R<sub>T</sub> = 750 + 3000 + 1 ÷ (1/1500 + 1/1500) = 4500 Ω. Real resistors are ±2 %, so your reading will be close, not exact.</p>`,hl:()=>['PS+','PS-'],done:()=>S.hand==='OHM'&&!S.supply.on&&isFinite(R.handVal)&&R.handVal!=null&&near(R.handVal,4500,0.03)},
+  {st:1,t:'Record it and get stamped',body:()=>`<p>Write the reading exactly as shown, converted to <b>ohms</b> (4.497 kΩ → 4497). Then call the instructor to stamp it.</p>`,action:'ohm'},
+  {st:2,t:'Set 30 V and energize',body:()=>`<p>Lift the probes. Set the supply to <b>30.0 V</b> with the buttons, then turn it <b>ON</b>. The supply should read about 6.7 mA.</p>`,done:()=>S.supply.on&&Math.abs(S.supply.set-30)<0.15},
+  {st:2,t:'Read I<sub>R3</sub> on the ammeter',body:()=>`<p>The bench meter starts on <b>DCV</b>, which shows nothing useful here. Switch it to <b>DCI</b>. It should read about 0.003333 A (3.333 mA).</p>`,done:()=>S.bench==='DCI'&&near(R.benchVal,IB_N*(S.supply.set/30),0.03)},
+  {st:2,t:'Measure V<sub>R1</sub> with correct polarity',body:()=>{const c=chain();return `<p>Handheld to <b>V⎓</b>. A voltmeter goes <b>across</b> (in parallel with) the part. Red probe on the end of ${c.r1?c.r1.name:'R1'} nearest Supply +, black on the other end. A negative reading means the probes are reversed.</p>`},hl:()=>{const c=chain();return c.r1?[endIn(c.r1,'PS+'),c.r1out]:[]},done:()=>{const t=liveTruth();return S.hand==='V'&&t&&near(R.handVal,t.R1,0.02)}},
+  {st:2,t:'Complete the chart',chart:true,body:()=>`<p>Fill the Voltage and Current rows and the Totals. Measure V<sub>R2</sub>–V<sub>R4</sub> the same way, and E<sub>T</sub> across the supply terminals. R<sub>T</sub> is your ohmmeter reading.</p><p class="hint">The ammeter gives I<sub>R3</sub>. R1 and R2 are in series, so I<sub>R1</sub> = I<sub>R2</sub> = I<sub>T</sub>. With measured values: I<sub>T</sub> = V<sub>R1</sub> ÷ R1 and I<sub>R4</sub> = V<sub>R4</sub> ÷ R4. Check that I<sub>R3</sub> + I<sub>R4</sub> ≈ I<sub>T</sub>. Use proper SI prefixes (mA, kΩ).</p>`,action:'chart'},
+  {st:3,t:'Demonstrate to the instructor',body:()=>`<p>Final call. The instructor asks to see I<sub>R3</sub> on the ammeter and the voltage across one resistor they name. Set up the probes, then press <b>Call instructor</b>. They write the mA and V values themselves.</p>`,action:'show'},
+  {st:3,t:'Practice complete',body:()=>`<p>You've measured, built, metered and demonstrated the whole practical. Try <b>Exam mode</b> next: shuffled board, two wiring attempts, no hints, marked like the sheet.</p>`,end:true},
+];
+function checkPracticeStep(){
+  const s=PSTEPS[S.step]; if(!s) return;
+  if(s.done && s.done()){ toast('Step complete','good'); advanceStep(); }
+  else updateHighlights();
+}
+function advanceStep(){ S.step=Math.min(S.step+1,PSTEPS.length-1); S.stage=PSTEPS[S.step].st; S.lastFb=null; if(PSTEPS[S.step].chart) S.chartOpen=true; if(S.stage===3&&!S.request) pickRequest(); renderAll(); setTimeout(()=>{ const s=PSTEPS[S.step]; if(s&&s.done&&s.done()) checkPracticeStep(); },50); }
+function updateHighlights(){
+  JACKS.forEach(j=>j.ring.visible=false);
+  if(S.pending){ const j=JMAP[S.pending]; j.ring.visible=true; j.ring.material.color.set(0xc42f27); }
+  if(S.mode==='practice'){ const s=PSTEPS[S.step]; if(s&&s.hl){ for(const id of s.hl()){ const j=JMAP[id]; if(j&&id!==S.pending){ j.ring.visible=true; j.ring.material.color.set(0x2c63c9);} } } }
+}
+
+// ================= HUD =================
+function jackName(id){ if(id==='PS+')return 'Supply +'; if(id==='PS-')return 'Supply −'; if(id==='AM_HI')return 'Meter HI (V/Ω)'; if(id==='AM_LO')return 'Meter LO (COM)'; if(id==='AM_mA')return 'Meter mA input'; const m=id.match(/^(R\d+)([ab])$/); const r=S.resistors.find(r=>r.name===m[1]); return `${m[1]} ${m[2]==='a'?'left':'right'} · ${fmtR(r.nom)}`; }
+function updateHud(){
+  $('psV').textContent=(R.psV||0).toFixed(1); $('psI').textContent=(R.psI||0).toFixed(3); $('psMode').textContent=R.cc?'A CC':'A';
+  $('psSet').textContent=S.supply.set.toFixed(1)+' V'; $('psState').textContent=S.supply.on?'ON':'OFF';
+  $('psToggle').textContent=S.supply.on?'Turn supply OFF':'Turn supply ON'; $('psToggle').className='btn '+(S.supply.on?'danger':'primary');
+  psLamp.material.color.set(S.supply.on?0xff3b1f:0x553333);
+  psSwitch.position.y = S.supply.on?0.12:0.0;
+  [...$('benchSeg').children].forEach(b=>b.classList.toggle('on',b.dataset.m===S.bench));
+  [...$('handSeg').children].forEach(b=>b.classList.toggle('on',b.dataset.m===S.hand));
+  $('benchVal').textContent=R.benchTxt; $('benchUnit').textContent=S.bench==='DCI'?`A⎓  (${(R.benchVal*1000).toFixed(4)} mA)`:'V⎓';
+  $('handVal').textContent=S.hand==='OFF'?'----':R.handTxt; $('handUnit').textContent=S.hand==='OFF'?'':R.handUnit;
+  $('probeInfo').innerHTML=`<span><span class="dot" style="background:#c42f27"></span> Red: ${S.probes.red?jackName(S.probes.red):'<span class="muted">not placed</span>'}</span><span><span class="dot" style="background:#24272b"></span> Black: ${S.probes.black?jackName(S.probes.black):'<span class="muted">not placed</span>'}</span>`;
+  [...document.querySelectorAll('.tool')].forEach(b=>b.classList.toggle('on',b.dataset.tool===S.tool));
+  $('leadDot').style.background=LEAD_COLORS[S.color];
+  [...$('swatches').children].forEach(b=>b.classList.toggle('on',b.dataset.c===S.color));
+  updateHighlights();
+}
+function renderPills(){
+  $('pills').innerHTML=STAGES.map((s,i)=>{ const sc=S.scores[i]; const cls=i===S.stage?'cur':(sc!=null?'done':''); let b='';
+    if(S.mode==='exam'){ b= i===0 ? `<b>${S.mult!=null?'×'+S.mult:'try '+Math.min(S.wireAttempts+1,2)+'/2'}</b>` : `<b>${sc!=null?fmtPts(sc):'–'}/${s.m}</b>`; }
+    return `<span class="pill ${cls}">${i+1} ${s.n} ${b}</span>`; }).join('');
+  $('modeChip').textContent=S.mode==='exam'?'Exam mode':S.mode==='practice'?'Practice mode':'—';
+  $('timer').hidden=S.mode!=='exam';
+}
+const fmtPts=n=>(Math.round(n*100)/100).toString();
+function fbList(items){ return `<ul class="fb">${items.map(i=>{ const st=i.st||(i.max>0&&i.pts>=i.max?'ok':i.pts>0?'part':'no'); const ic={ok:'✓',part:'◐',no:'✕',info:'i'}[st]; const pt=i.max!=null?`${fmtPts(i.pts)}/${i.max}`:(i.pts!=null?fmtPts(i.pts):''); return `<li class="${st}"><span class="ic">${ic}</span><span><b>${i.label}.</b> ${i.note}</span><span class="pts">${pt}</span></li>`; }).join('')}</ul>`; }
+const SCHEM = `<svg class="schem" viewBox="0 0 300 150" role="img" aria-label="Schematic: 30 V source, R1 750 ohm and R2 3000 ohm in series, then R3 with ammeter in parallel with R4, both 1.5 kilohm">
+<g fill="none" stroke="currentColor" stroke-width="2">
+<path d="M30 70V20H70"/><path d="M70 20l4-7 8 14 8-14 8 14 8-14 8 14 4-7"/><path d="M118 20H140"/><path d="M140 20l4-7 8 14 8-14 8 14 8-14 8 14 4-7"/><path d="M188 20H270"/>
+<path d="M215 20V40"/><path d="M215 40l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M215 80V92"/><circle cx="215" cy="104" r="12"/><path d="M215 116V130"/>
+<path d="M270 20V50"/><path d="M270 50l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M270 90V130H30V90"/>
+<path d="M18 70H42M23 78H37M18 84H42M23 92H37" /></g>
+<g fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="10"><text x="80" y="44">R1 750</text><text x="150" y="44">R2 3k</text><text x="228" y="62">R3</text><text x="228" y="74">1.5k</text><text x="252" y="112" text-anchor="end"></text><text x="282" y="70">R4</text><text x="282" y="82">1.5k</text><text x="0" y="62">+</text><text x="2" y="116">30V</text><text x="210" y="108" font-weight="700">A</text><text x="223" y="96">+</text></g>
+<circle cx="215" cy="20" r="3" fill="currentColor"/><circle cx="215" cy="130" r="3" fill="currentColor"/></svg>`;
+function renderGuide(){
+  const g=$('guide'); let h='';
+  if(S.mode==='practice'){
+    const s=PSTEPS[S.step];
+    h+=`<div class="sec stepcard"><div class="stepno">STEP ${S.step+1} OF ${PSTEPS.length}</div><h2>${s.t}</h2>${s.body()}
+      <div class="row">${s.next?'<button class="btn primary" id="nextBtn">Next</button>':''}${s.end?'<button class="btn primary" id="toExam">Start exam mode</button>':''}${S.step>0?'<button class="btn sm" id="prevBtn">Back</button>':''}${!s.next&&!s.end?'<button class="btn sm" id="skipBtn">Skip step</button>':''}</div></div>`;
+    if(S.lastFb) h+=`<div class="sec"><div class="lbl">Instructor feedback</div>${fbList(S.lastFb)}</div>`;
+    h+=`<div class="sec"><div class="lbl">Reference circuit</div>${SCHEM}<p class="small muted">Current flows from + through R1 and R2, then splits through R3 (and the ammeter) and R4 before returning to −.</p></div>`;
+  } else if(S.mode==='exam' && S.stage<=3){
+    const titles=['Measure, build & get checked','Ohmmeter reading','Energize & record','Demonstrate I<sub>R3</sub> & V<sub>R</sub>'];
+    const marks=['sets the Part B multiplier','Part A · 8 marks','Part B · 12 marks','Part B · 8 marks'];
+    const txt=[
+      `<p>Supply OFF. Measure each resistor out of circuit and record it in the chart's Resistance row. Then build the circuit and call the instructor. <b>Do not energize.</b></p><p class="hint">Attempt ${Math.min(S.wireAttempts+1,2)} of 2. First attempt: errors are pointed out and you can fix them. Second attempt: if the circuit still doesn't work as outlined, the test is over. Errors left at that point multiply Part B: 1 → ×0.8, 2 → ×0.5, more → ×0.1.</p>`,
+      `<p>Measure total resistance with the ohmmeter and record it. Call the instructor to view the reading and stamp it. Energizing before the stamp loses 20 marks and ends the exam.</p>`,
+      S.sub===0?`<p>Stamped. Set the supply to <b>30 V</b> and energize.</p>`:`<p>Measure total resistance, resistor voltages and resistor currents and complete the chart with proper SI prefixes. Submit when you're satisfied with the results.</p>`,
+      `<p>Final call. Show the instructor I<sub>R3</sub> on the ammeter and the voltage across the resistor they name. The test is over after this.</p>`][S.stage];
+    h+=`<div class="sec stepcard"><div class="stepno">STAGE ${S.stage+1} OF 4 · ${marks[S.stage].toUpperCase()}</div><h2>${titles[S.stage]}</h2>${txt}</div>`;
+    h+=`<div class="sec"><div class="lbl">Question 1</div><div class="spec">Series-parallel circuit: <b>R1 = 750 Ω</b> in series with <b>R2 = 3000 Ω</b>. These two are connected with <b>R3 = 1.5 kΩ</b> and <b>R4 = 1.5 kΩ</b>, which are in parallel with each other. <b>Source = 30 V.</b> Show only the meter needed to measure the current for <b>R3</b>.</div></div>`;
+    if(S.lastFb) h+=`<div class="sec"><div class="lbl">Instructor feedback <span class="r">stage ${S.lastFbStage+1}</span></div>${fbList(S.lastFb)}</div>`;
+    if(S.deductions.length) h+=`<div class="sec"><div class="lbl">Safety deductions <span class="r">from Part B</span></div>${fbList(S.deductions.map(d=>({label:'Safety',st:'no',pts:-d.pts,note:d.text})))}</div>`;
+  }
+  g.innerHTML=h;
+  const nb=$('nextBtn'); if(nb) nb.onclick=()=>advanceStep();
+  const pb=$('prevBtn'); if(pb) pb.onclick=()=>{ S.step--; S.stage=PSTEPS[S.step].st; S.lastFb=null; renderAll(); };
+  const sb=$('skipBtn'); if(sb) sb.onclick=()=>advanceStep();
+  const te=$('toExam'); if(te) te.onclick=()=>start('exam');
+}
+function chartHTML(){
+  const locked=S.mode==='exam'&&S.scores[2]!=null;
+  const cell=k=>{ const c=cellRaw(k); const m=S.chartMarks[k]; const cls=m===true?'good':m===false?'badv':''; return `<div class="cell"><input id="ch_${k}" data-k="${k}" class="${cls}" inputmode="decimal" value="${c.v}" ${locked?'disabled':''} aria-label="${cellName(k)} value"><select id="cu_${k}" data-k="${k}" ${locked?'disabled':''} aria-label="${cellName(k)} unit">${UNITS[k[0]].map(u=>`<option${u[0]===c.u?' selected':''}>${u[0]}</option>`).join('')}</select></div>`; };
+  return `<div class="chartwrap"><table class="chart"><thead><tr><th></th>${COLS.map(c=>`<th>${c}</th>`).join('')}<th colspan="2">Totals</th></tr></thead><tbody>${ROWS.map(r=>`<tr><th scope="row">${r.lab}<br><span class="u">${r.marks} marks</span></th>${COLS.map(c=>`<td>${cell(r.r+'_'+c)}</td>`).join('')}<td class="tl">${r.tot} =</td><td>${cell(r.r+'_T')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderDock(){
+  const d=$('dock');
+  if(!S.mode||S.mode==='done'||S.stage>3||(S.mode==='practice'&&PSTEPS[S.step].end)){ d.innerHTML=''; return; }
+  const ex=S.mode==='exam', st=S.stage; let act='';
+  if(st===0){
+    act=`<div class="sec"><div class="row" style="justify-content:space-between"><p class="small muted" style="flex:1;min-width:200px">Supply stays OFF. When your circuit is ready, call the instructor to check it.</p><button class="btn primary" id="callWire">Call instructor${ex?` · attempt ${Math.min(S.wireAttempts+1,2)}/2`:''}</button></div></div>`;
+  } else if(st===1){
+    act=`<div class="sec"><div class="lbl">Part A · call instructor over to view ohmmeter reading</div>
+      <div class="ohmbox"><label for="ohmIn">Ohmmeter reading</label><div class="row" style="flex-wrap:nowrap"><input id="ohmIn" inputmode="decimal" placeholder="e.g. 4497" value="${S.ohmEntry}"><span class="small">Ohms</span></div>
+      <label>Instructor stamp</label><div class="stampbox">${S.stamped?'<span class="stamp">Checked ✓</span>':''}</div></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn primary" id="callOhm">Call instructor</button></div></div>`;
+  } else if(st===2){
+    act= ex&&S.sub===0 ? `<div class="sec"><p class="small">Stamped. Set 30.0 V on the supply panel and turn it ON. The chart opens once the circuit is live.</p></div>`
+      : `<div class="sec"><div class="row" style="justify-content:space-between"><p class="small muted" style="flex:1;min-width:200px">Complete every cell with a unit, then ${ex?'submit. You can only submit once.':'check it.'}</p><button class="btn primary" id="submitChart">${ex?'Submit chart':'Check chart'}</button></div></div>`;
+  } else if(st===3){
+    const rec=S.demoRec;
+    act=`<div class="sec"><div class="lbl">Instructor request</div><div class="req">“Show me <b>I<sub>R3</sub></b> on your ammeter and the <b>voltage across ${S.request}</b> on your voltmeter.”</div>
+      <div class="ohmbox"><label>Instructor only</label><div class="mono">${rec&&rec.mA!=null?rec.mA.toFixed(3):'____'} mA &nbsp;·&nbsp; ${rec&&rec.V!=null?rec.V.toFixed(3):'____'} V</div></div>
+      <div class="row" style="justify-content:flex-end">${ex?'':'<button class="btn sm" id="newReq">Different request</button>'}<button class="btn primary" id="callShow">Call instructor</button></div></div>`;
+  }
+  const chartSec=`<div class="sec"><div class="lbl"><span>Part B · measure &amp; record <span class="r">/12</span></span><button class="btn sm" id="chartToggle" aria-expanded="${S.chartOpen}">${S.chartOpen?'Hide chart':'Show chart'}</button></div>${S.chartOpen?chartHTML()+'<p class="small muted">Pick the unit beside each value. Use proper SI prefixes.</p>':''}</div>`;
+  d.innerHTML=act+chartSec;
+  const cw=$('callWire'); if(cw) cw.onclick=onCallWire;
+  const co=$('callOhm'); if(co) co.onclick=onCallOhm;
+  const oi=$('ohmIn'); if(oi) oi.oninput=e=>S.ohmEntry=e.target.value;
+  const ct=$('chartToggle'); if(ct) ct.onclick=()=>{ S.chartOpen=!S.chartOpen; renderDock(); };
+  const touch=k=>{ const el=$('ch_'+k); if(el) el.classList.remove('good','badv'); delete S.chartMarks[k]; };
+  document.querySelectorAll('.chart input').forEach(inp=>{ inp.oninput=e=>{ const k=e.target.dataset.k; S.chartVals[k]={...cellRaw(k),v:e.target.value}; touch(k); }; inp.onchange=()=>{ if(S.mode==='practice') checkPracticeStep(); }; });
+  document.querySelectorAll('.chart select').forEach(sel=>sel.onchange=e=>{ const k=e.target.dataset.k; S.chartVals[k]={...cellRaw(k),u:e.target.value}; touch(k); if(S.mode==='practice') checkPracticeStep(); });
+  const sc=$('submitChart'); if(sc) sc.onclick=onChart;
+  const cs=$('callShow'); if(cs) cs.onclick=onShow;
+  const nr=$('newReq'); if(nr) nr.onclick=()=>{ pickRequest(true); S.demoRec=null; renderDock(); };
+}
+function renderAll(){ renderPills(); renderGuide(); renderDock(); updateHud(); }
+
+// ================= stage actions =================
+function setFb(items){ S.lastFb=items; S.lastFbStage=S.stage; }
+function onCallWire(){
+  if(S.supply.on && S.mode==='exam') return;
+  const g=gradeWiring();
+  if(S.mode==='exam'){
+    S.wireAttempts++; setFb(g.items); S.details[0]=g.items;
+    if(g.errors===0 || (S.wireAttempts>=2 && g.working)){
+      S.mult=multFor(g.errors); S.scores[0]=S.mult; S.wireErrors=g.errors; S.roles=g.a.roles||null; S.stage=1;
+      toast(g.errors?`Instructor: circuit works with ${g.errors} error(s). Part B ×${S.mult}`:'Instructor: wiring approved. Part B ×1');
+    } else if(S.wireAttempts<2){ toast(`First attempt: ${g.errors} error(s). Fix them and call again.`,'bad'); }
+    else { S.endReason='wiring'; S.wireErrors=g.errors; finishExam(); return; }
+    renderAll();
+  } else {
+    setFb(g.items);
+    if(g.errors===0){ S.roles=g.a.roles; toast('Instructor: wiring approved','good'); advanceStep(); }
+    else { toast(`${g.errors} error(s). In the exam that's Part B ×${multFor(g.errors)} on a second attempt.`,'bad'); renderGuide(); }
+  }
+}
+function onCallOhm(){
+  const g=gradeOhm(S.ohmEntry);
+  if(S.mode==='exam'){ S.scores[1]=g.score; S.details[1]=g.items; setFb(g.items); S.stamped=true; S.stage=2; S.sub=0; toast(`Ohmmeter reading stamped: ${fmtPts(g.score)}/8`); renderAll(); }
+  else { setFb(g.items); if(g.score>=8){ S.stamped=true; renderDock(); toast('Stamped. You may now energize.','good'); setTimeout(advanceStep,700); } else { toast(`Ohmmeter ${g.score}/8, see feedback`,'bad'); renderGuide(); } }
+}
+function onChart(){
+  const g=gradeChart();
+  if(S.mode==='exam'){ S.scores[2]=g.score; S.details[2]=g.items; setFb(g.items); S.stage=3; S.chartOpen=false; pickRequest(); toast(`Chart submitted: ${fmtPts(g.score)}/12`); renderAll(); }
+  else { setFb(g.items); renderDock(); renderGuide(); if(g.score>=12){ toast('Chart all correct','good'); advanceStep(); } else toast(`Chart ${fmtPts(g.score)}/12, red cells need another look`,'bad'); }
+}
+function onShow(){
+  const g=gradeShow();
+  if(S.mode==='exam'){ S.scores[3]=g.score; S.details[3]=g.items; finishExam(); }
+  else { setFb(g.items); renderDock(); renderGuide(); if(g.score>=8){ toast('Instructor satisfied','good'); advanceStep(); } else toast(`Demonstration ${g.score}/8, see feedback`,'bad'); }
+}
+function pickRequest(force){ const opts=['R1','R2','R3','R4'].filter(r=>r!==S.request||!force); S.request=opts[Math.floor(Math.random()*opts.length)]; }
+function finishExam(){
+  const ended = S.failed || S.endReason==='wiring';
+  const partA = S.failed ? 0 : (S.scores[1]||0);
+  const bRaw = (S.scores[2]||0)+(S.scores[3]||0);
+  const mult = S.mult ?? 0;
+  const safety = S.deductions.reduce((s,d)=>s+d.pts,0);
+  const partB = ended ? 0 : Math.max(0, bRaw*mult - safety);
+  const total = partA + partB;
+  const tm=fmtTime(Date.now()-S.t0);
+  const det=i=>S.details[i]?'<div class="small muted">'+S.details[i].map(it=>`${it.st==='ok'||(it.max>0&&it.pts>=it.max)?'✓':it.st==='info'?'i':'✕'} ${it.label}: ${it.note}`).join('<br>')+'</div>':'<div class="small muted">Not reached.</div>';
+  const why = S.failed ? 'The circuit was energized before the ohmmeter stamp. On the real sheet that loses the 20 Part B marks and you cannot continue.'
+    : S.endReason==='wiring' ? 'The circuit still did not work as outlined on the second wiring check, so the test was deemed complete at that point.'
+    : total>=24 ? 'Strong run. Repeat it until the sequence is automatic.' : total>=16 ? 'Passing, with marks left on the table. Read the notes below.' : 'Rough run. Do the guided practice once more, then retry.';
+  let rows='';
+  rows+=`<tr><td><b>Wiring check</b> · ${S.wireAttempts} attempt(s), ${S.wireErrors??'–'} error(s) left${det(0)}</td><td class="n">${S.mult!=null?'×'+S.mult:'—'}</td></tr>`;
+  rows+=`<tr><td><b>Part A · Ohmmeter reading</b>${det(1)}</td><td class="n">${fmtPts(partA)} / 8</td></tr>`;
+  rows+=`<tr><td><b>Part B · Measurement chart</b>${det(2)}</td><td class="n">${fmtPts(S.scores[2]||0)} / 12</td></tr>`;
+  rows+=`<tr><td><b>Part B · Demonstrate I<sub>R3</sub> & V<sub>R</sub></b>${det(3)}</td><td class="n">${fmtPts(S.scores[3]||0)} / 8</td></tr>`;
+  if(S.deductions.length) rows+=S.deductions.map(d=>`<tr><td>Safety: ${d.text}</td><td class="n">−${d.pts}</td></tr>`).join('');
+  rows+=`<tr><td><b>Part B total</b> = (${fmtPts(bRaw)} / 20) × ${S.mult??0}${safety?` − ${safety} safety`:''}${ended?' · test ended early':''}</td><td class="n"><b>${fmtPts(partB)} / 20</b></td></tr>`;
+  const el=$('resultSheet');
+  el.innerHTML=`<div class="lbl">Midterm lab exam · simulated result <span class="r">time ${tm}</span></div>
+    <div class="row" style="align-items:baseline;gap:16px"><div class="total">${fmtPts(total)}<small> / 28</small></div><p class="muted" style="flex:1;min-width:220px">${why}</p></div>
+    <table class="tbl"><thead><tr><th>Item</th><th style="text-align:right">Marks</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small muted">Out of 28: Part A's 8-mark ohmmeter box plus Part B's 20. The 12-mark schematic in Part A isn't simulated, so the real sheet totals 40.</p>
+    <div class="row"><button class="btn primary" id="again">Retry exam</button><button class="btn" id="toPractice">Guided practice</button><button class="btn" id="viewBench">Look at my bench</button></div>`;
+  $('resultOv').hidden=false;
+  $('again').onclick=()=>{ $('resultOv').hidden=true; start('exam'); };
+  $('toPractice').onclick=()=>{ $('resultOv').hidden=true; start('practice'); };
+  $('viewBench').onclick=()=>{ $('resultOv').hidden=true; S.mode='done'; $('dock').innerHTML=''; $('guide').innerHTML=''; };
+  S.stage=4; renderPills();
+}
+
+// ================= interactions =================
+let toastT;
+function toast(msg,kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast '+kind; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,2600); }
+function addLead(a,b){
+  if(a===b) return;
+  if(stackAt(a).length>=3||stackAt(b).length>=3){ toast('That jack is full. Banana plugs only stack so far.','bad'); return; }
+  S.leads.push({id:S.nid++,a,b,color:S.color}); rebuildLeads(); rebuildProbes(); recompute();
+}
+function removeLead(id){ S.leads=S.leads.filter(L=>L.id!==id); rebuildLeads(); rebuildProbes(); recompute(); }
+function clickJack(id){
+  if(!S.mode||S.mode==='done') return;
+  if(S.tool==='lead'){
+    if(!S.pending){ S.pending=id; updateHighlights(); toast(`From ${jackName(id)} — now click the other end`); }
+    else if(S.pending===id){ S.pending=null; updateHighlights(); }
+    else { const a=S.pending; S.pending=null; addLead(a,id); }
+  } else if(S.tool==='remove'){
+    const st=stackAt(id); if(st.length) removeLead(st[st.length-1][0].id);
+  } else {
+    const k=S.tool==='probeRed'?'red':'black';
+    if(S.held===k){ S.probes[k]=id; S.held=null; S.tool=S.prevTool||'lead'; toast(`${k==='red'?'Red':'Black'} probe on ${jackName(id)}`); }
+    else S.probes[k]=S.probes[k]===id?null:id;
+    rebuildProbes(); recompute();
+  }
+}
+function grabProbe(k){
+  if(!S.mode||S.mode==='done') return;
+  if(S.held===k){ S.held=null; S.tool=S.prevTool||'lead'; rebuildProbes(); updateHud(); return; }
+  if(!S.held) S.prevTool=S.tool;
+  S.held=k; S.probes[k]=null; S.pending=null; S.tool=k==='red'?'probeRed':'probeBlack';
+  rebuildProbes(); recompute();
+  toast(`${k==='red'?'Red':'Black'} probe picked up. Click a terminal to place it.`);
+}
+function toggleSupply(){
+  if(!S.mode||S.mode==='done') return;
+  const turningOn=!S.supply.on;
+  if(turningOn && S.mode==='exam' && !S.stamped){
+    S.supply.on=true; recompute(); S.failed=true;
+    finishExam(); return;
+  }
+  if(turningOn && S.mode==='practice' && !S.stamped) toast('In the exam this costs 20 marks: never energize before the ohmmeter stamp.','bad');
+  S.supply.on=turningOn;
+  if(turningOn){ S.setAtOn=S.supply.set; if(S.mode==='exam'&&S.stage===2&&S.sub===0){ S.sub=1; S.chartOpen=true; renderAll(); } }
+  recompute();
+}
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+function pick(e){
+  const r=renderer.domElement.getBoundingClientRect(); ndc.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects([...pickJacks,...leadGroup.children,psSwitch,...probeMeshes],false);
+  return hits[0]?hits[0].object:null;
+}
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{ down=[e.clientX,e.clientY]; });
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!down) return; const moved=Math.hypot(e.clientX-down[0],e.clientY-down[1]); down=null; if(moved>6) return;
+  const o=pick(e); if(!o) return;
+  const u=o.userData;
+  if(u.psSwitch) return toggleSupply();
+  if(u.probe){ if(S.held&&S.held!==u.probe){ /* fall through to drop other */ } return grabProbe(u.probe); }
+  if(S.tool==='remove' && u.lead){ return removeLead(u.lead); }
+  if(u.jack) return clickJack(u.jack);
+  if(u.lead && S.tool==='lead') toast('Use the Remove tool to unplug a lead');
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+  const tip=$('tip'); const o=pick(e); const r=host.getBoundingClientRect();
+  if(o&&o.userData.probe){ tip.hidden=false; const nm=o.userData.probe==='red'?'Red probe':'Black probe'; tip.textContent=S.held===o.userData.probe?`${nm}: click to put down`:(S.probes[o.userData.probe]?`${nm}: click to lift and move`:`${nm}: click to pick up`); tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; renderer.domElement.style.cursor='grab'; }
+  else if(o&&(o.userData.jack||o.userData.psSwitch)){ tip.hidden=false; tip.textContent=o.userData.psSwitch?'Power switch':`${jackName(o.userData.jack)}${stackAt(o.userData.jack).length?` · ${stackAt(o.userData.jack).length} plug(s)`:''}`; tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; renderer.domElement.style.cursor='pointer'; }
+  else if(o&&o.userData.lead&&S.tool==='remove'){ tip.hidden=false; tip.textContent='Unplug this lead'; tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; renderer.domElement.style.cursor='pointer'; }
+  else { tip.hidden=true; renderer.domElement.style.cursor=''; }
+});
+renderer.domElement.addEventListener('pointerleave',()=>$('tip').hidden=true);
+
+// HUD bindings
+Object.entries(LEAD_COLORS).forEach(([k,c],i)=>{ const b=document.createElement('button'); b.className='sw'; b.style.background=c; b.dataset.c=k; b.title=`${k} lead (${i+1})`; b.setAttribute('aria-label',`${k} lead`); b.onclick=()=>{ S.color=k; S.tool='lead'; updateHud(); }; $('swatches').appendChild(b); });
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{ S.tool=b.dataset.tool; S.pending=null; if(S.held){ S.held=null; rebuildProbes(); } updateHud(); });
+$('undoBtn').onclick=()=>{ const L=S.leads[S.leads.length-1]; if(L) removeLead(L.id); };
+$('clearProbes').onclick=()=>{ S.probes={red:null,black:null}; S.held=null; rebuildProbes(); recompute(); };
+$('clearAll').onclick=()=>{ S.leads=[]; S.probes={red:null,black:null}; S.pending=null; rebuildLeads(); rebuildProbes(); recompute(); };
+document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=()=>{ S.supply.set=Math.max(0,Math.min(30,Math.round((S.supply.set+parseFloat(b.dataset.dv))*10)/10)); recompute(); });
+$('psToggle').onclick=toggleSupply;
+[...$('benchSeg').children].forEach(b=>b.onclick=()=>{ S.bench=b.dataset.m; recompute(); });
+[...$('handSeg').children].forEach(b=>b.onclick=()=>{ S.hand=b.dataset.m; recompute(); });
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  const keys=Object.keys(LEAD_COLORS);
+  if(/^[1-5]$/.test(e.key)){ S.color=keys[+e.key-1]; S.tool='lead'; updateHud(); }
+  else if(e.key==='l'||e.key==='L'){ S.tool='lead'; updateHud(); }
+  else if(e.key==='x'||e.key==='X'){ S.tool='remove'; S.pending=null; updateHud(); }
+  else if(e.key==='Escape'){ S.pending=null; if(S.held){ S.held=null; S.tool=S.prevTool||'lead'; rebuildProbes(); updateHud(); } updateHighlights(); }
+});
+$('menuBtn').onclick=()=>{ $('resultOv').hidden=true; $('startOv').hidden=false; };
+$('goPractice').onclick=()=>start('practice');
+$('goExam').onclick=()=>start('exam');
+
+// ================= start / reset =================
+function start(mode){
+  const vals = BASE_VALUES.slice();
+  if(mode==='exam'){ for(let i=vals.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [vals[i],vals[j]]=[vals[j],vals[i]]; } }
+  S.resistors = vals.map((v,i)=>({name:`R${i+1}`,nom:v,act:v*(1+(Math.random()*2-1)*0.02),a:`R${i+1}a`,b:`R${i+1}b`}));
+  Object.assign(S,{mode,leads:[],nid:1,probes:{red:null,black:null},supply:{set:0,on:false},bench:'DCV',hand:'OFF',tool:'lead',color:'red',pending:null,stage:0,step:0,sub:0,scores:[null,null,null,null],details:[null,null,null,null],deductions:[],stamped:false,ohmEntry:'',request:null,setAtOn:null,failed:false,t0:Date.now(),flagged:{},lastFb:null,held:null,prevTool:'lead',chartVals:{},chartMarks:{},wireAttempts:0,wireErrors:null,mult:null,roles:null,chartOpen:false,demoRec:null,endReason:null});
+  $('startOv').hidden=true; $('resultOv').hidden=true;
+  drawBoard(); rebuildLeads(); rebuildProbes(); recompute(); renderAll();
+}
+function fmtTime(ms){ const s=Math.floor(ms/1000); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+setInterval(()=>{ if(S.mode==='exam') $('timer').textContent=fmtTime(Date.now()-S.t0); },1000);
+
+// initial idle bench (behind the start sheet)
+S.resistors = BASE_VALUES.map((v,i)=>({name:`R${i+1}`,nom:v,act:v,a:`R${i+1}a`,b:`R${i+1}b`}));
+drawBoard(); rebuildProbes(); recompute(); renderPills();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ drawBoard(); drawPS(); drawBM(); drawHH(); });
+
+// ================= loop =================
+// WASD camera movement
+const held=new Set();
+const typing=e=>{const t=e.target; return t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA');};
+window.addEventListener('keydown',e=>{ if(typing(e)) return; const k=e.key.toLowerCase(); if('wasdqe'.includes(k)&&k.length===1){ held.add(k); e.preventDefault(); } if(e.key==='Shift') held.add('shift'); });
+window.addEventListener('keyup',e=>{ held.delete(e.key.toLowerCase()); if(e.key==='Shift') held.delete('shift'); });
+window.addEventListener('blur',()=>held.clear());
+const _fwd=new THREE.Vector3(), _right=new THREE.Vector3(), _mv=new THREE.Vector3();
+function moveCamera(dt){
+  if(!held.size) return;
+  camera.getWorldDirection(_fwd); _fwd.y=0; if(_fwd.lengthSq()<1e-6) _fwd.set(0,0,-1); _fwd.normalize();
+  _right.crossVectors(_fwd,UP).normalize();
+  _mv.set(0,0,0);
+  if(held.has('w')) _mv.add(_fwd); if(held.has('s')) _mv.sub(_fwd);
+  if(held.has('d')) _mv.add(_right); if(held.has('a')) _mv.sub(_right);
+  if(held.has('e')) _mv.y+=1; if(held.has('q')) _mv.y-=1;
+  if(!_mv.lengthSq()) return;
+  const speed=(held.has('shift')?24:11)*dt;
+  _mv.normalize().multiplyScalar(speed);
+  const nt=controls.target.clone().add(_mv);
+  nt.x=Math.max(-30,Math.min(30,nt.x)); nt.z=Math.max(-25,Math.min(25,nt.z)); nt.y=Math.max(-0.5,Math.min(12,nt.y));
+  _mv.subVectors(nt,controls.target);
+  controls.target.add(_mv); camera.position.add(_mv);
+  if(camera.position.y<0.2){ camera.position.y=0.2; }
+}
+const clock=new THREE.Clock();
+(function loop(){
+  const t=clock.getElapsedTime(); const s=1+0.18*Math.sin(t*5);
+  for(const j of JACKS) if(j.ring.visible) j.ring.scale.set(s,s,s);
+  { const now=performance.now(); moveCamera(Math.min((now-(window.__lastT||now))/1000,0.05)); window.__lastT=now; } controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);
+})();
+})();
+</script>
+
+</body></html>
