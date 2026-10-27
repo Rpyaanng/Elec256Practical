@@ -246,7 +246,7 @@ select,option{background:var(--paper)}
       <div class="lbl">ELEC-256 midterm lab · Part B practical</div>
       <h1>Wire it, <span>meter it</span>, get it stamped.</h1>
       <p class="muted">A bench simulator for the series-parallel practical: banana leads, a trainer board, a DC supply, a bench ammeter and a handheld DMM. Drag to orbit, scroll or pinch to zoom, WASD to move, click jacks to plug in.</p>
-      <div class="spec"><b>The circuit:</b> R1 = <b>750 Ω</b> in series with R2 = <b>3000 Ω</b>, then R3 = <b>1.5 kΩ</b> in parallel with R4 = <b>1.5 kΩ</b>. Source = <b>30 V</b>. One ammeter, measuring the current through <b>R3</b>.</div>
+      <div class="spec"><b>The circuit:</b> R1 = <b>1.5 kΩ</b>, R2 = <b>750 Ω</b>, R3 = <b>750 Ω</b> and R4 = <b>3 kΩ</b>, all in parallel. Source = <b>30 V</b>. One ammeter, in series with <b>R2</b> on its + side.</div>
       <div class="choices">
         <button class="choice" id="goPractice"><span class="t">Practice</span><ul><li>Step-by-step guided build with highlighted jacks</li><li>Reference schematic and hints</li><li>Check your work as often as you like</li></ul></button>
         <button class="choice" id="goExam"><span class="t">Exam</span><ul><li>Marked like the sheet: ohmmeter /8, chart /12, demonstration /8</li><li>Two wiring checks; leftover errors multiply Part B</li><li>Resistor positions on the board are shuffled</li><li>Energize before the stamp and you lose 20 marks</li></ul></button>
@@ -264,7 +264,7 @@ select,option{background:var(--paper)}
 // ================= constants =================
 const SHUNT = 2.0;      // ammeter mA-input shunt, ohms
 const ILIM = 0.2;       // supply current limit, A
-const IT_N = 30/4500, IB_N = IT_N/2;
+const RT_N = 1/(1/1500+2/750+1/3000), IT_N = 30/RT_N, IB_N = 30/750; // all-parallel: RT ≈ 272.7 Ω, IT = 110 mA, I(R2) = 40 mA
 const LEAD_COLORS = {red:'#c92f27',black:'#24272b',blue:'#2c63c9',yellow:'#dcb22a',orange:'#e7741e'};
 const BASE_VALUES = [3000,3000,1000,1000,1500,1500,750,750,10,10,2,2,250,250];
 const STAGES = [{n:'Wire',m:null},{n:'Ohmmeter',m:8},{n:'Chart',m:12},{n:'Demonstrate',m:8}];
@@ -584,18 +584,17 @@ function analyze(){
   const I=r=>(v(r.a)-v(r.b))/r.nom;
   const active=S.resistors.filter(r=>Math.abs(I(r))>2e-5);
   res.active=active;
-  res.valsOk = active.map(r=>r.nom).sort((a,b)=>a-b).join(',')==='750,1500,1500,3000';
+  res.valsOk = active.map(r=>r.nom).sort((a,b)=>a-b).join(',')==='750,750,1500,3000';
   const Ia=(v('AM_mA')-v('AM_LO'))/SHUNT; res.Ia=Ia;
   if(Math.abs(Ia)<2e-5) res.amm='none'; else if(near(Ia,IB_N)) res.amm='ok'; else if(near(Ia,-IB_N)) res.amm='reversed'; else if(near(Math.abs(Ia),IT_N)) res.amm='total'; else res.amm='other';
-  res.currentsOk=false; res.orderOk=false;
+  res.currentsOk=false; res.before=false;
   if(res.valsOk && !res.short){
-    const r750=active.find(r=>r.nom===750), r3k=active.find(r=>r.nom===3000), p=active.filter(r=>r.nom===1500);
-    res.currentsOk = near(Math.abs(I(r750)),IT_N)&&near(Math.abs(I(r3k)),IT_N)&&p.every(r=>near(Math.abs(I(r)),IB_N))&&near(s.Isup,IT_N);
-    const hi=r=>v(r.a)>=v(r.b)?r.a:r.b, lo=r=>v(r.a)>=v(r.b)?r.b:r.a;
-    res.orderOk = res.currentsOk && same(hi(r750),'PS+') && same(hi(r3k),lo(r750));
-    let r3=p[0], r4=p[1];
-    if(res.amm==='ok'||res.amm==='reversed'){ const s2=solve({nominal:true,on:true,V:30,shunt:1000,limit:false}); const I2=r=>Math.abs((s2.v(r.a)-s2.v(r.b))/r.nom); if(I2(p[1])<I2(p[0])){ r3=p[1]; r4=p[0]; } }
-    if(res.currentsOk) res.roles={R1:r750,R2:r3k,R3:r3,R4:r4};
+    // fully parallel: every resistor sits across the full 30 V
+    res.currentsOk = active.every(r=>near(Math.abs(I(r)),30/r.nom))&&near(s.Isup,IT_N);
+    res.before = same('AM_mA','PS+')||same('AM_LO','PS+');
+    const p=active.filter(r=>r.nom===750); let r2=p[0], r3=p[1];
+    if(res.amm==='ok'||res.amm==='reversed'){ const s2=solve({nominal:true,on:true,V:30,shunt:1000,limit:false}); const I2=r=>Math.abs((s2.v(r.a)-s2.v(r.b))/r.nom); if(I2(p[1])<I2(p[0])){ r2=p[1]; r3=p[0]; } }
+    if(res.currentsOk) res.roles={R1:active.find(r=>r.nom===1500),R2:r2,R3:r3,R4:active.find(r=>r.nom===3000)};
   }
   // lead checks
   res.stackBad = JACKS.filter(j=>stackAt(j.id).length>2).map(j=>j.id);
@@ -609,14 +608,15 @@ function gradeWiring(){
   let topoOk=false, note;
   if(a.short) note='Short circuit across the supply. The supply would go straight into current limit.';
   else if(!S.leads.length) note='Nothing is wired yet.';
-  else if(!a.valsOk){ const got=a.active.map(r=>`${r.name} (${fmtR(r.nom)})`).join(', ')||'none'; note=`Wrong resistors carry current. Expected 750 Ω, 3 kΩ, 1.5 kΩ, 1.5 kΩ. Found: ${got}.`; }
-  else if(!a.currentsOk) note='Right resistors, wrong arrangement. R1 and R2 must be in series, R3 and R4 in parallel with each other.';
-  else if(!a.orderOk) note='Circuit works but not in the given sequence: + → R1 (750 Ω) → R2 (3 kΩ) → R3 ∥ R4 → −.';
-  else { topoOk=true; note='Series-parallel network correct and in sequence.'; }
-  add('Circuit & sequence',topoOk,note);
-  const amMsg={ok:'Ammeter in series with R3 only, correct polarity (current into mA, out of COM).',reversed:'Ammeter in R3 branch but polarity reversed (reads negative). Current must enter the mA jack.',total:'Ammeter is measuring total current, not R3 only.',none:'No current through the ammeter. It must be in series with R3.',other:'Ammeter is in the wrong place.'};
-  const ammOk=a.currentsOk&&a.amm==='ok';
-  add('Ammeter on R3, correct polarity',ammOk,(!a.currentsOk&&a.amm==='ok')?'Ammeter is wired but the rest of the circuit is wrong.':amMsg[a.short?'other':a.amm]);
+  else if(!a.valsOk){ const got=a.active.map(r=>`${r.name} (${fmtR(r.nom)})`).join(', ')||'none'; note=`Wrong resistors carry current. Expected 1.5 kΩ, 750 Ω, 750 Ω, 3 kΩ. Found: ${got}.`; }
+  else if(!a.currentsOk) note='Right resistors, wrong arrangement. All four must be in parallel: one end of each on the + rail, the other on the − rail.';
+  else { topoOk=true; note='All four resistors in parallel across the supply.'; }
+  add('Parallel circuit',topoOk,note);
+  const amMsg={ok:'Ammeter in series with R2 only, on its + side, correct polarity (current into mA, out of COM).',reversed:'Ammeter in R2 branch but polarity reversed (reads negative). Current must enter the mA jack.',total:'Ammeter is measuring total current, not R2 only.',none:'No current through the ammeter. It must be in series with R2.',other:'Ammeter is in the wrong branch. It must be in series with R2 (a 750 Ω) only.'};
+  const ammOk=a.currentsOk&&a.amm==='ok'&&a.before;
+  let amNote=(!a.currentsOk&&a.amm==='ok')?'Ammeter is wired but the rest of the circuit is wrong.':amMsg[a.short?'other':a.amm];
+  if(a.currentsOk&&(a.amm==='ok'||a.amm==='reversed')&&!a.before) amNote='Ammeter is in R2\'s branch but on the − side. Put it before R2: + rail → mA, COM → R2.'+(a.amm==='reversed'?' Polarity is also reversed.':'');
+  add('Ammeter before R2, correct polarity',ammOk,amNote);
   add('Supply lead colours',a.colorsOk,a.colorsOk?'Red from +, black from −.':'Leads from the supply must be red on + and black on −.');
   add('Max 2 banana plugs per jack',!a.stackBad.length,a.stackBad.length?`Too many plugs stacked on ${a.stackBad.map(jackName).join(', ')}.`:'No jack has more than 2 plugs.');
   const idleOk=!a.idle.length&&S.leads.length>0;
@@ -629,8 +629,8 @@ const multFor=e=>e<=0?1:e===1?0.8:e===2?0.5:0.1;
 function gradeOhm(entry){
   const items=[]; const reading=R.handVal;
   const valid = S.hand==='OHM' && !S.supply.on && S.probes.red && S.probes.black && isFinite(reading) && reading!=null;
-  const across = valid && near(reading,4500+SHUNT*0,0.03);
-  items.push({label:'Ohmmeter connected across the whole circuit',pts:across?4:0,max:4,note:!valid?(S.supply.on?'Supply must be OFF to measure resistance.':S.hand!=='OHM'?'Handheld DMM is not on Ω.':'Probes are not giving a valid reading.'):across?`Meter reads ${R.handTxt} ${R.handUnit}, total resistance of the network.`:`Meter reads ${R.handTxt} ${R.handUnit}. That is not R_T (≈ 4.5 kΩ). Probe across the points where the supply connects.`});
+  const across = valid && near(reading,RT_N,0.03);
+  items.push({label:'Ohmmeter connected across the whole circuit',pts:across?4:0,max:4,note:!valid?(S.supply.on?'Supply must be OFF to measure resistance.':S.hand!=='OHM'?'Handheld DMM is not on Ω.':'Probes are not giving a valid reading.'):across?`Meter reads ${R.handTxt} ${R.handUnit}, total resistance of the network.`:`Meter reads ${R.handTxt} ${R.handUnit}. That is not R_T (≈ 273 Ω). Probe across the points where the supply connects.`});
   const e=parseFloat(String(entry).replace(/[, ]/g,''));
   const recOk = valid && isFinite(e) && Math.abs(e-reading)<=Math.max(1,reading*0.005);
   items.push({label:'Reading recorded correctly in ohms',pts:recOk?4:0,max:4,note:!isFinite(e)?'No value entered.':recOk?`${e} Ω recorded.`:(valid?`Entered ${e} Ω, meter shows ${Math.round(reading)} Ω. Watch kΩ vs Ω.`:'Record the value the meter actually shows.')});
@@ -653,12 +653,17 @@ function truthAll(){
 function liveTruth(){ const t=truthAll(); if(!t) return null; return {R1:t.V_R1,R2:t.V_R2,R3:t.V_R3,R4:t.V_R4,I3:t.Ia*1000,roles:t.roles}; }
 function gradeChart(){
   const t=truthAll(); const marks={}; const items=[]; const prefix=[];
-  const tol={R:0.01,V:0.015,I:0.015};
+  const tol={R:0.02,V:0.015,I:0.015};
+  const check=(k,tk)=>{ const v=cellVal(k); if(!t||!isFinite(v)) return false; const tv=t[tk]; let g=tv>0&&Math.abs(v-tv)<=Math.max(tv*tol[k[0]],k[0]==='V'?0.01:0); if(k==='V_T'&&Math.abs(t.V_T-30)>0.2) g=false; return g; };
+  // R2 and R3 are both 750 Ω: grade the pair as written or swapped, whichever fits better,
+  // but the swap must apply to every row at once so the chart stays self-consistent.
+  const pairScore=sw=>['R','V','I'].reduce((n,r)=>n+(check(r+'_R2',r+(sw?'_R3':'_R2'))?1:0)+(check(r+'_R3',r+(sw?'_R2':'_R3'))?1:0),0);
+  const swapped = !!t && pairScore(true)>pairScore(false);
+  const tkey=k=>{ if(!swapped) return k; if(k.endsWith('_R2')) return k.replace('_R2','_R3'); if(k.endsWith('_R3')) return k.replace('_R3','_R2'); return k; };
   for(const row of ROWS){
     const keys=[...COLS.map(c=>row.r+'_'+c),row.r+'_T']; const bad=[]; let ok=0;
     for(const k of keys){
-      const v=cellVal(k); let good=false;
-      if(t&&isFinite(v)){ const tv=t[k]; good=tv>0&&Math.abs(v-tv)<=Math.max(tv*tol[row.r],row.r==='V'?0.01:0); if(k==='V_T'&&Math.abs(t.V_T-30)>0.2) good=false; }
+      const good=check(k,tkey(k));
       marks[k]=good; if(good) ok++; else bad.push(cellName(k));
       const raw=parseFloat(cellRaw(k).v); if(isFinite(raw)&&raw!==0&&(Math.abs(raw)>=1000||Math.abs(raw)<1)) prefix.push(`${raw} ${cellRaw(k).u} (${cellName(k)})`);
     }
@@ -667,6 +672,7 @@ function gradeChart(){
     items.push({label:`${row.lab} row`,pts:+(ok*row.marks/5).toFixed(2),max:row.marks,note});
   }
   S.chartMarks=marks;
+  if(swapped) items.push({label:'R2 / R3 columns',st:'info',note:`Your R2 and R3 columns match the two 750 Ω resistors the other way round. Accepted, since they're the same nominal value and you recorded them consistently. Remember that R2 is the one with the ammeter in its branch.`});
   if(prefix.length) items.push({label:'SI prefixes',st:'info',note:`${prefix.join(', ')}. Values read better with a prefix that keeps the number between 1 and 999 (4.497 kΩ, 3.33 mA). Not deducted here.`});
   return {items,score:items.reduce((s,i)=>s+(i.pts||0),0)};
 }
@@ -683,49 +689,39 @@ function gradeShow(){
   if(!truth) iNote='Circuit not wired as specified.';
   else if(!S.supply.on) iNote='Circuit is not energized.';
   else if(S.bench!=='DCI') iNote='Bench meter must be on DCI to read current.';
-  else { const t=Math.abs(truth.I3)/1000; iOk=R.benchVal>0&&near(R.benchVal,t,0.02); iNote=iOk?`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA through R3.`:(near(-R.benchVal,t,0.02)?'Ammeter reads negative: polarity reversed. Current must enter the mA jack.':`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA; expected about ${(t*1000).toFixed(3)} mA.`); }
-  items.push({label:'I<sub>R3</sub> on the ammeter',pts:iOk?4:0,max:4,note:iNote});
+  else { const t=Math.abs(truth.I3)/1000; iOk=R.benchVal>0&&near(R.benchVal,t,0.02); iNote=iOk?`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA through R2.`:(near(-R.benchVal,t,0.02)?'Ammeter reads negative: polarity reversed. Current must enter the mA jack.':`Ammeter shows ${(R.benchVal*1000).toFixed(3)} mA; expected about ${(t*1000).toFixed(3)} mA.`); }
+  items.push({label:'I<sub>R2</sub> on the ammeter',pts:iOk?4:0,max:4,note:iNote});
   return {items,score:items.reduce((s,i)=>s+i.pts,0)};
 }
 
 // ================= practice tutorial =================
-function chain(){
-  const rs=v=>S.resistors.filter(r=>r.nom===v);
-  const out=(r,n)=>same(r.a,n)?r.b:r.a;
-  const res={k:0};
-  const r1=rs(750).find(r=>same(r.a,'PS+')||same(r.b,'PS+')); if(!r1) return res; res.r1=r1; res.k=1;
-  const n1=out(r1,'PS+'); res.r1out=n1;
-  const r2=rs(3000).find(r=>same(r.a,n1)||same(r.b,n1)); if(!r2) return res; res.r2=r2; res.k=2;
-  const n2=out(r2,n1); res.r2out=n2;
-  const par=rs(1500).filter(r=>same(r.a,n2)||same(r.b,n2)); if(par.length<1) return res; res.p=par; res.k=3;
-  if(par.length<2) return res; res.k=4;
-  const far=r=>out(r,n2);
-  const withMA=par.find(r=>same(far(r),'AM_mA')); if(!withMA) return res; res.r3=withMA; res.k=5;
-  const other=par.find(r=>r!==withMA); res.r4=other;
-  if(!same('AM_LO',far(other))) return res; res.k=6;
-  if(!same(far(other),'PS-')) return res; res.k=7; return res;
-}
+function farEnd(r,n){ return same(r.a,n)?r.b:r.a; }
+function topEnd(r){ return same(r.a,'PS+')?r.a:same(r.b,'PS+')?r.b:null; }
 function firstOf(v,skip=[]){ return S.resistors.find(r=>r.nom===v && !skip.includes(r)); }
 function endIn(r,n){ return same(r.a,n)?r.a:r.b; }
-const hintSlots=()=>{const a=firstOf(1500);return {R1:firstOf(750),R2:firstOf(3000),R3:a,R4:firstOf(1500,[a])};};
+const hintSlots=()=>{const a=firstOf(750);return {R1:firstOf(1500),R2:a,R3:firstOf(750,[a]),R4:firstOf(3000)};};
+const H=()=>hintSlots();
+const onPlus=r=>!!topEnd(r);
+const botNode=()=>{ const h=H(); const ends=[h.R1,h.R3,h.R4].map(r=>topEnd(r)?farEnd(r,'PS+'):null); const r2e=same(h.R2.a,'AM_LO')?h.R2.b:same(h.R2.b,'AM_LO')?h.R2.a:null; return {ends,r2e}; };
+const bottomJoined=()=>{ const {ends,r2e}=botNode(); if(ends.some(e=>!e)||!r2e) return false; return ends.every(e=>same(e,r2e)); };
 const PSTEPS = [
-  {st:0,t:'Get oriented',body:()=>`<p>Drag to orbit the bench, scroll or pinch to zoom, and use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move around (<kbd>Q</kbd>/<kbd>E</kbd> down/up, hold <kbd>Shift</kbd> to go faster). Click a jack, then another jack, to run a banana lead between them. Hover a jack to see its name.</p><p>The trainer board labels its own resistors R1–R14. Those are <b>board</b> labels. Your <b>circuit</b> R1 is whichever 750 Ω you pick.</p><p class="hint">Keys: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move, <kbd>Q</kbd>/<kbd>E</kbd> down/up, <kbd>1</kbd>–<kbd>5</kbd> lead colour, <kbd>L</kbd> lead tool, <kbd>X</kbd> remove tool, <kbd>Esc</kbd> cancel.</p>`,next:true},
-  {st:0,t:'Measure each resistor first',chart:true,body:()=>{const h=hintSlots();return `<p>The sheet says to measure each resistor <b>before</b> you build. Set the handheld DMM to <b>Ω</b>, put the probes across a resistor's two jacks, and record the reading in the chart's <b>Resistance</b> row.</p><p>Use board <b>${h.R1.name}</b> as circuit R1, <b>${h.R2.name}</b> as R2, <b>${h.R3.name}</b> as R3 and <b>${h.R4.name}</b> as R4.</p><p class="hint">Measure out of circuit. Once wired, R3 reads in parallel with R4 (about 750 Ω). Pick the unit beside each box: 1.507 kΩ and 1507 Ω are both accepted. The step completes when all four match.</p>`},hl:()=>{const h=hintSlots();return Object.values(h).flatMap(r=>[r.a,r.b])},done:()=>{const h=hintSlots();return COLS.every(k=>near(cellVal('R_'+k),h[k].act,0.01))}},
-  {st:0,t:'Supply + to R1 (750 Ω)',body:()=>{const r=firstOf(750);return `<p>Pick the <b>red</b> lead. Connect <b>Supply +</b> to the left jack of board <b>${r.name}</b> (750 Ω). The supply stays OFF the whole time you wire.</p>`},hl:()=>['PS+',firstOf(750).name+'a'],done:()=>chain().k>=1 && S.leads.filter(L=>L.a==='PS+'||L.b==='PS+').every(L=>L.color==='red')},
-  {st:0,t:'R1 in series with R2 (3 kΩ)',body:()=>{const c=chain();return `<p>Any colour except red/black is good for jumpers (blue is common). Connect the other end of ${c.r1?c.r1.name:'R1'} to one end of a <b>3 kΩ</b> resistor, e.g. board <b>${firstOf(3000).name}</b>.</p>`},hl:()=>{const c=chain();return c.r1?[c.r1out,firstOf(3000).name+'a']:[]},done:()=>chain().k>=2},
-  {st:0,t:'R2 into the parallel pair',body:()=>{const c=chain();const a=firstOf(1500);return `<p>Connect the free end of ${c.r2?c.r2.name:'the 3 kΩ'} to a <b>1.5 kΩ</b> resistor, e.g. <b>${a.name}</b>. This one becomes your circuit <b>R3</b>.</p>`},hl:()=>{const c=chain();return c.r2?[c.r2out,firstOf(1500).name+'a']:[]},done:()=>chain().k>=3},
-  {st:0,t:'Put R4 in parallel',body:()=>{const c=chain();const b=firstOf(1500,c.p||[]);return `<p>Jumper from the top of ${c.p?c.p[0].name:'R3'} to the matching end of the second 1.5 kΩ (<b>${b?b.name:'—'}</b>). Stacking a second plug on a jack is fine; <b>2 per jack is the limit</b>.</p>`},hl:()=>{const c=chain();if(!c.p)return[];const b=firstOf(1500,c.p);return [endIn(c.p[0],c.r2out),b?b.name+'a':null]},done:()=>chain().k>=4},
-  {st:0,t:'Ammeter in series with R3',body:()=>{const c=chain();return `<p>An ammeter goes <b>in series</b>, so it breaks into R3's branch. Run a <b>red</b> lead from the free end of <b>${c.p?c.p[0].name:'R3'}</b> to the bench meter's <b>mA</b> jack. Current must flow <i>into</i> mA.</p>`},hl:()=>{const c=chain();if(!c.p)return['AM_mA'];const r=c.p[0];return [same(r.a,c.r2out)?r.b:r.a,'AM_mA']},done:()=>chain().k>=5},
-  {st:0,t:'Meter COM to the bottom node',body:()=>{const c=chain();return `<p>Black lead from the meter's <b>LO (COM)</b> jack to the free end of <b>${c.r4?c.r4.name:'R4'}</b>. That joins R3's branch back to R4 at the bottom node.</p>`},hl:()=>{const c=chain();if(!c.r4)return['AM_LO'];const r=c.r4;return ['AM_LO',same(r.a,c.r2out)?r.b:r.a]},done:()=>chain().k>=6},
-  {st:0,t:'Return to Supply −',body:()=>{const c=chain();return `<p><b>Black</b> lead from that same bottom node (free end of ${c.r4?c.r4.name:'R4'}) to <b>Supply −</b>. That jack now holds 2 plugs, the maximum.</p>`},hl:()=>{const c=chain();if(!c.r4)return['PS-'];const r=c.r4;return [same(r.a,c.r2out)?r.b:r.a,'PS-']},done:()=>chain().k>=7 && S.leads.filter(L=>L.a==='PS-'||L.b==='PS-').every(L=>L.color==='black')},
-  {st:0,t:'Call the instructor',body:()=>`<p>Press <b>Call instructor</b> below. In the exam you get two attempts. On the first, errors are pointed out and you can fix them. On the second, if the circuit still doesn't work as outlined, the test is over.</p><p class="hint">Errors still there at the second check multiply your whole Part B mark: 1 error ×0.8, 2 errors ×0.5, more ×0.1. Checked: circuit & sequence, ammeter on R3 with polarity, supply lead colours, ≤2 plugs per jack, no loose leads.</p>`,action:'wire'},
-  {st:1,t:'Measure total resistance',body:()=>`<p>Supply stays <b>OFF</b>. Set the handheld DMM to <b>Ω</b>. Put the <b>red probe</b> on the Supply + jack and the <b>black probe</b> on Supply −. With the supply off and open, the meter sees the whole network.</p><p class="hint">Expected: R<sub>T</sub> = 750 + 3000 + 1 ÷ (1/1500 + 1/1500) = 4500 Ω. Real resistors are ±2 %, so your reading will be close, not exact.</p>`,hl:()=>['PS+','PS-'],done:()=>S.hand==='OHM'&&!S.supply.on&&isFinite(R.handVal)&&R.handVal!=null&&near(R.handVal,4500,0.03)},
-  {st:1,t:'Record it and get stamped',body:()=>`<p>Write the reading exactly as shown, converted to <b>ohms</b> (4.497 kΩ → 4497). Then call the instructor to stamp it.</p>`,action:'ohm'},
-  {st:2,t:'Set 30 V and energize',body:()=>`<p>Lift the probes. Set the supply to <b>30.0 V</b> with the buttons, then turn it <b>ON</b>. The supply should read about 6.7 mA.</p>`,done:()=>S.supply.on&&Math.abs(S.supply.set-30)<0.15},
-  {st:2,t:'Read I<sub>R3</sub> on the ammeter',body:()=>`<p>The bench meter starts on <b>DCV</b>, which shows nothing useful here. Switch it to <b>DCI</b>. It should read about 0.003333 A (3.333 mA).</p>`,done:()=>S.bench==='DCI'&&near(R.benchVal,IB_N*(S.supply.set/30),0.03)},
-  {st:2,t:'Measure V<sub>R1</sub> with correct polarity',body:()=>{const c=chain();return `<p>Handheld to <b>V⎓</b>. A voltmeter goes <b>across</b> (in parallel with) the part. Red probe on the end of ${c.r1?c.r1.name:'R1'} nearest Supply +, black on the other end. A negative reading means the probes are reversed.</p>`},hl:()=>{const c=chain();return c.r1?[endIn(c.r1,'PS+'),c.r1out]:[]},done:()=>{const t=liveTruth();return S.hand==='V'&&t&&near(R.handVal,t.R1,0.02)}},
-  {st:2,t:'Complete the chart',chart:true,body:()=>`<p>Fill the Voltage and Current rows and the Totals. Measure V<sub>R2</sub>–V<sub>R4</sub> the same way, and E<sub>T</sub> across the supply terminals. R<sub>T</sub> is your ohmmeter reading.</p><p class="hint">The ammeter gives I<sub>R3</sub>. R1 and R2 are in series, so I<sub>R1</sub> = I<sub>R2</sub> = I<sub>T</sub>. With measured values: I<sub>T</sub> = V<sub>R1</sub> ÷ R1 and I<sub>R4</sub> = V<sub>R4</sub> ÷ R4. Check that I<sub>R3</sub> + I<sub>R4</sub> ≈ I<sub>T</sub>. Use proper SI prefixes (mA, kΩ).</p>`,action:'chart'},
-  {st:3,t:'Demonstrate to the instructor',body:()=>`<p>Final call. The instructor asks to see I<sub>R3</sub> on the ammeter and the voltage across one resistor they name. Set up the probes, then press <b>Call instructor</b>. They write the mA and V values themselves.</p>`,action:'show'},
+  {st:0,t:'Get oriented',body:()=>`<p>Drag to orbit the bench, scroll or pinch to zoom, and use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move around (<kbd>Q</kbd>/<kbd>E</kbd> down/up, hold <kbd>Shift</kbd> to go faster). Click a jack, then another jack, to run a banana lead between them. Hover a jack to see its name.</p><p>The trainer board labels its own resistors R1–R14. Those are <b>board</b> labels. Your <b>circuit</b> R1 is whichever 1.5 kΩ you pick.</p><p class="hint">Keys: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move, <kbd>Q</kbd>/<kbd>E</kbd> down/up, <kbd>1</kbd>–<kbd>5</kbd> lead colour, <kbd>L</kbd> lead tool, <kbd>X</kbd> remove tool, <kbd>Esc</kbd> cancel.</p>`,next:true},
+  {st:0,t:'Measure each resistor first',chart:true,body:()=>{const h=H();return `<p>The sheet says to measure each resistor <b>before</b> you build. Set the handheld DMM to <b>Ω</b>, put the probes across a resistor's two jacks, and record the reading in the chart's <b>Resistance</b> row.</p><p>Use board <b>${h.R1.name}</b> (1.5 kΩ) as circuit R1, <b>${h.R2.name}</b> and <b>${h.R3.name}</b> (750 Ω) as R2 and R3, and <b>${h.R4.name}</b> (3 kΩ) as R4.</p><p class="hint">Measure out of circuit. Once everything is wired in parallel, each resistor reads about 273 Ω. Pick the unit beside each box: 1.507 kΩ and 1507 Ω are both accepted. The step completes when all four match.</p>`},hl:()=>{const h=H();return Object.values(h).flatMap(r=>[r.a,r.b])},done:()=>{const h=H();const m=(k,r)=>near(cellVal('R_'+k),r.act,0.02);return m('R1',h.R1)&&m('R4',h.R4)&&((m('R2',h.R2)&&m('R3',h.R3))||(m('R2',h.R3)&&m('R3',h.R2)))}},
+  {st:0,t:'Supply + to R1 (1.5 kΩ)',body:()=>{const h=H();return `<p>Pick the <b>red</b> lead. Connect <b>Supply +</b> to the left jack of board <b>${h.R1.name}</b> (1.5 kΩ). In a parallel circuit, the left jacks will all become the <b>+ rail</b>. The supply stays OFF the whole time you wire.</p>`},hl:()=>['PS+',H().R1.a],done:()=>onPlus(H().R1)&&S.leads.filter(L=>L.a==='PS+'||L.b==='PS+').every(L=>L.color==='red')},
+  {st:0,t:'R3 onto the + rail',body:()=>{const h=H();return `<p>Use a jumper (blue is common; keep red and black for the supply). Connect the left jack of <b>${h.R1.name}</b> to the left jack of <b>${h.R3.name}</b> (750 Ω, your circuit R3). That jack on ${h.R1.name} now has 2 plugs, the limit.</p>`},hl:()=>{const h=H();return [h.R1.a,h.R3.a]},done:()=>onPlus(H().R3)},
+  {st:0,t:'R4 onto the + rail',body:()=>{const h=H();return `<p>Jumper from the left jack of <b>${h.R3.name}</b> to the left jack of <b>${h.R4.name}</b> (3 kΩ). Daisy-chaining like this keeps every jack at 2 plugs or fewer.</p>`},hl:()=>{const h=H();return [h.R3.a,h.R4.a]},done:()=>onPlus(H().R4)},
+  {st:0,t:'Ammeter before R2',body:()=>{const h=H();return `<p>The ammeter goes <b>in series</b> with R2, on its <b>+ side</b>. Run a <b>red</b> lead from the left jack of <b>${h.R4.name}</b> (the + rail) to the bench meter's <b>mA</b> jack. Current must flow <i>into</i> mA.</p>`},hl:()=>['AM_mA',H().R4.a],done:()=>same('AM_mA','PS+')},
+  {st:0,t:'Meter COM to R2',body:()=>{const h=H();return `<p><b>Black</b> lead from the meter's <b>LO (COM)</b> jack to the left jack of <b>${h.R2.name}</b> (750 Ω, your circuit R2). Now R2's current, and only R2's, passes through the ammeter.</p>`},hl:()=>['AM_LO',H().R2.a],done:()=>{const h=H();return same('AM_LO',h.R2.a)||same('AM_LO',h.R2.b)}},
+  {st:0,t:'Join the − rail',body:()=>{const h=H();return `<p>Now join the right jacks of all four resistors with jumpers: <b>${h.R1.name}</b> → <b>${h.R3.name}</b> → <b>${h.R4.name}</b> → <b>${h.R2.name}</b>. These form the <b>− rail</b>.</p>`},hl:()=>{const h=H();return [h.R1.b,h.R3.b,h.R4.b,h.R2.b]},done:()=>bottomJoined()},
+  {st:0,t:'Return to Supply −',body:()=>{const h=H();return `<p><b>Black</b> lead from the right jack of <b>${h.R1.name}</b> to <b>Supply −</b>. That completes all four branches.</p>`},hl:()=>['PS-',H().R1.b],done:()=>bottomJoined()&&same(botNode().r2e,'PS-')&&S.leads.filter(L=>L.a==='PS-'||L.b==='PS-').every(L=>L.color==='black')},
+  {st:0,t:'Call the instructor',body:()=>`<p>Press <b>Call instructor</b> below. In the exam you get two attempts. On the first, errors are pointed out and you can fix them. On the second, if the circuit still doesn't work as outlined, the test is over.</p><p class="hint">Errors still there at the second check multiply your whole Part B mark: 1 error ×0.8, 2 errors ×0.5, more ×0.1. Checked: all four in parallel, ammeter before R2 with correct polarity, supply lead colours, ≤2 plugs per jack, no loose leads.</p>`,action:'wire'},
+  {st:1,t:'Measure total resistance',body:()=>`<p>Supply stays <b>OFF</b>. Set the handheld DMM to <b>Ω</b>. Put the <b>red probe</b> on the Supply + jack and the <b>black probe</b> on Supply −. With the supply off and open, the meter sees the whole network.</p><p class="hint">Expected: R<sub>T</sub> = 1 ÷ (1/1500 + 1/750 + 1/750 + 1/3000) ≈ 272.7 Ω. That's lower than the smallest resistor, which is always true in parallel. Real resistors are ±2 %, so your reading will be close, not exact.</p>`,hl:()=>['PS+','PS-'],done:()=>S.hand==='OHM'&&!S.supply.on&&isFinite(R.handVal)&&R.handVal!=null&&near(R.handVal,RT_N,0.03)},
+  {st:1,t:'Record it and get stamped',body:()=>`<p>Write the reading exactly as shown, in <b>ohms</b> (e.g. 272.9). Then call the instructor to stamp it.</p>`,action:'ohm'},
+  {st:2,t:'Set 30 V and energize',body:()=>`<p>Lift the probes. Set the supply to <b>30.0 V</b> with the buttons, then turn it <b>ON</b>. The supply should read about 0.110 A (110 mA).</p>`,done:()=>S.supply.on&&Math.abs(S.supply.set-30)<0.15},
+  {st:2,t:'Read I<sub>R2</sub> on the ammeter',body:()=>`<p>The bench meter starts on <b>DCV</b>, which shows nothing useful here. Switch it to <b>DCI</b>. It should read about 0.040 A (40 mA).</p>`,done:()=>S.bench==='DCI'&&near(R.benchVal,IB_N*(S.supply.set/30),0.03)},
+  {st:2,t:'Measure V<sub>R1</sub> with correct polarity',body:()=>{const h=H();return `<p>Handheld to <b>V⎓</b>. A voltmeter goes <b>across</b> (in parallel with) the part. Red probe on the + rail end of <b>${h.R1.name}</b>, black on the − rail end. In a parallel circuit you should see the full supply voltage. A negative reading means the probes are reversed.</p>`},hl:()=>{const h=H();return [h.R1.a,h.R1.b]},done:()=>{const t=liveTruth();return S.hand==='V'&&t&&near(R.handVal,t.R1,0.02)}},
+  {st:2,t:'Complete the chart',chart:true,body:()=>`<p>Fill the Voltage and Current rows and the Totals. Measure V<sub>R2</sub>–V<sub>R4</sub> the same way, and E<sub>T</sub> across the supply terminals. R<sub>T</sub> is your ohmmeter reading.</p><p class="hint">Parallel branches all share the supply voltage, so each V<sub>R</sub> ≈ E<sub>T</sub>. The ammeter gives I<sub>R2</sub>. For the others use I = V ÷ R with your measured values, then I<sub>T</sub> = I<sub>R1</sub> + I<sub>R2</sub> + I<sub>R3</sub> + I<sub>R4</sub>. Check it against the supply's current display. Use proper SI prefixes (mA, kΩ).</p>`,action:'chart'},
+  {st:3,t:'Demonstrate to the instructor',body:()=>`<p>Final call. The instructor asks to see I<sub>R2</sub> on the ammeter and the voltage across one resistor they name. Set up the probes, then press <b>Call instructor</b>. They write the mA and V values themselves.</p>`,action:'show'},
   {st:3,t:'Practice complete',body:()=>`<p>You've measured, built, metered and demonstrated the whole practical. Try <b>Exam mode</b> next: shuffled board, two wiring attempts, no hints, marked like the sheet.</p>`,end:true},
 ];
 function checkPracticeStep(){
@@ -767,14 +763,22 @@ function renderPills(){
 }
 const fmtPts=n=>(Math.round(n*100)/100).toString();
 function fbList(items){ return `<ul class="fb">${items.map(i=>{ const st=i.st||(i.max>0&&i.pts>=i.max?'ok':i.pts>0?'part':'no'); const ic={ok:'✓',part:'◐',no:'✕',info:'i'}[st]; const pt=i.max!=null?`${fmtPts(i.pts)}/${i.max}`:(i.pts!=null?fmtPts(i.pts):''); return `<li class="${st}"><span class="ic">${ic}</span><span><b>${i.label}.</b> ${i.note}</span><span class="pts">${pt}</span></li>`; }).join('')}</ul>`; }
-const SCHEM = `<svg class="schem" viewBox="0 0 300 150" role="img" aria-label="Schematic: 30 V source, R1 750 ohm and R2 3000 ohm in series, then R3 with ammeter in parallel with R4, both 1.5 kilohm">
+const SCHEM = `<svg class="schem" viewBox="0 0 300 160" role="img" aria-label="Schematic: 30 V source with R1 1.5 kilohm, R2 750 ohm with the ammeter above it, R3 750 ohm and R4 3 kilohm, all in parallel">
 <g fill="none" stroke="currentColor" stroke-width="2">
-<path d="M30 70V20H70"/><path d="M70 20l4-7 8 14 8-14 8 14 8-14 8 14 4-7"/><path d="M118 20H140"/><path d="M140 20l4-7 8 14 8-14 8 14 8-14 8 14 4-7"/><path d="M188 20H270"/>
-<path d="M215 20V40"/><path d="M215 40l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M215 80V92"/><circle cx="215" cy="104" r="12"/><path d="M215 116V130"/>
-<path d="M270 20V50"/><path d="M270 50l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M270 90V130H30V90"/>
-<path d="M18 70H42M23 78H37M18 84H42M23 92H37" /></g>
-<g fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="10"><text x="80" y="44">R1 750</text><text x="150" y="44">R2 3k</text><text x="228" y="62">R3</text><text x="228" y="74">1.5k</text><text x="252" y="112" text-anchor="end"></text><text x="282" y="70">R4</text><text x="282" y="82">1.5k</text><text x="0" y="62">+</text><text x="2" y="116">30V</text><text x="210" y="108" font-weight="700">A</text><text x="223" y="96">+</text></g>
-<circle cx="215" cy="20" r="3" fill="currentColor"/><circle cx="215" cy="130" r="3" fill="currentColor"/></svg>`;
+<path d="M30 70V20H270"/><path d="M30 92V140H270"/>
+<path d="M18 70H42M23 78H37M18 84H42M23 92H37"/>
+<path d="M90 20V60"/><path d="M90 60l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M90 100V140"/>
+<path d="M150 20V32"/><circle cx="150" cy="44" r="12"/><path d="M150 56V64"/><path d="M150 64l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M150 104V140"/>
+<path d="M210 20V60"/><path d="M210 60l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M210 100V140"/>
+<path d="M270 20V60"/><path d="M270 60l-7 4 14 8-14 8 14 8-14 8 7 4"/><path d="M270 100V140"/></g>
+<g fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="10">
+<text x="0" y="62">+</text><text x="2" y="120">30V</text>
+<text x="100" y="78">R1</text><text x="100" y="90">1.5k</text>
+<text x="145" y="48" font-weight="700">A</text><text x="157" y="34">+</text><text x="157" y="62">−</text>
+<text x="160" y="82">R2</text><text x="160" y="94">750</text>
+<text x="220" y="78">R3</text><text x="220" y="90">750</text>
+<text x="280" y="78">R4</text><text x="280" y="90">3k</text></g>
+<g fill="currentColor"><circle cx="90" cy="20" r="3"/><circle cx="150" cy="20" r="3"/><circle cx="210" cy="20" r="3"/><circle cx="90" cy="140" r="3"/><circle cx="150" cy="140" r="3"/><circle cx="210" cy="140" r="3"/></g></svg>`;
 function renderGuide(){
   const g=$('guide'); let h='';
   if(S.mode==='practice'){
@@ -782,17 +786,17 @@ function renderGuide(){
     h+=`<div class="sec stepcard"><div class="stepno">STEP ${S.step+1} OF ${PSTEPS.length}</div><h2>${s.t}</h2>${s.body()}
       <div class="row">${s.next?'<button class="btn primary" id="nextBtn">Next</button>':''}${s.end?'<button class="btn primary" id="toExam">Start exam mode</button>':''}${S.step>0?'<button class="btn sm" id="prevBtn">Back</button>':''}${!s.next&&!s.end?'<button class="btn sm" id="skipBtn">Skip step</button>':''}</div></div>`;
     if(S.lastFb) h+=`<div class="sec"><div class="lbl">Instructor feedback</div>${fbList(S.lastFb)}</div>`;
-    h+=`<div class="sec"><div class="lbl">Reference circuit</div>${SCHEM}<p class="small muted">Current flows from + through R1 and R2, then splits through R3 (and the ammeter) and R4 before returning to −.</p></div>`;
+    h+=`<div class="sec"><div class="lbl">Reference circuit</div>${SCHEM}<p class="small muted">Each branch connects straight across the supply, so every resistor sees 30 V. The total current splits four ways; R2's share passes through the ammeter first.</p></div>`;
   } else if(S.mode==='exam' && S.stage<=3){
-    const titles=['Measure, build & get checked','Ohmmeter reading','Energize & record','Demonstrate I<sub>R3</sub> & V<sub>R</sub>'];
+    const titles=['Measure, build & get checked','Ohmmeter reading','Energize & record','Demonstrate I<sub>R2</sub> & V<sub>R</sub>'];
     const marks=['sets the Part B multiplier','Part A · 8 marks','Part B · 12 marks','Part B · 8 marks'];
     const txt=[
       `<p>Supply OFF. Measure each resistor out of circuit and record it in the chart's Resistance row. Then build the circuit and call the instructor. <b>Do not energize.</b></p><p class="hint">Attempt ${Math.min(S.wireAttempts+1,2)} of 2. First attempt: errors are pointed out and you can fix them. Second attempt: if the circuit still doesn't work as outlined, the test is over. Errors left at that point multiply Part B: 1 → ×0.8, 2 → ×0.5, more → ×0.1.</p>`,
       `<p>Measure total resistance with the ohmmeter and record it. Call the instructor to view the reading and stamp it. Energizing before the stamp loses 20 marks and ends the exam.</p>`,
       S.sub===0?`<p>Stamped. Set the supply to <b>30 V</b> and energize.</p>`:`<p>Measure total resistance, resistor voltages and resistor currents and complete the chart with proper SI prefixes. Submit when you're satisfied with the results.</p>`,
-      `<p>Final call. Show the instructor I<sub>R3</sub> on the ammeter and the voltage across the resistor they name. The test is over after this.</p>`][S.stage];
+      `<p>Final call. Show the instructor I<sub>R2</sub> on the ammeter and the voltage across the resistor they name. The test is over after this.</p>`][S.stage];
     h+=`<div class="sec stepcard"><div class="stepno">STAGE ${S.stage+1} OF 4 · ${marks[S.stage].toUpperCase()}</div><h2>${titles[S.stage]}</h2>${txt}</div>`;
-    h+=`<div class="sec"><div class="lbl">Question 1</div><div class="spec">Series-parallel circuit: <b>R1 = 750 Ω</b> in series with <b>R2 = 3000 Ω</b>. These two are connected with <b>R3 = 1.5 kΩ</b> and <b>R4 = 1.5 kΩ</b>, which are in parallel with each other. <b>Source = 30 V.</b> Show only the meter needed to measure the current for <b>R3</b>.</div></div>`;
+    h+=`<div class="sec"><div class="lbl">Question 1</div><div class="spec">Parallel circuit: <b>R1 = 1.5 kΩ</b>, <b>R2 = 750 Ω</b>, <b>R3 = 750 Ω</b> and <b>R4 = 3 kΩ</b>, all in parallel with each other. <b>Source = 30 V.</b> Show only the meter needed to measure the current for <b>R2</b>, connected before R2.</div></div>`;
     if(S.lastFb) h+=`<div class="sec"><div class="lbl">Instructor feedback <span class="r">stage ${S.lastFbStage+1}</span></div>${fbList(S.lastFb)}</div>`;
     if(S.deductions.length) h+=`<div class="sec"><div class="lbl">Safety deductions <span class="r">from Part B</span></div>${fbList(S.deductions.map(d=>({label:'Safety',st:'no',pts:-d.pts,note:d.text})))}</div>`;
   }
@@ -823,7 +827,7 @@ function renderDock(){
       : `<div class="sec"><div class="row" style="justify-content:space-between"><p class="small muted" style="flex:1;min-width:200px">Complete every cell with a unit, then ${ex?'submit. You can only submit once.':'check it.'}</p><button class="btn primary" id="submitChart">${ex?'Submit chart':'Check chart'}</button></div></div>`;
   } else if(st===3){
     const rec=S.demoRec;
-    act=`<div class="sec"><div class="lbl">Instructor request</div><div class="req">“Show me <b>I<sub>R3</sub></b> on your ammeter and the <b>voltage across ${S.request}</b> on your voltmeter.”</div>
+    act=`<div class="sec"><div class="lbl">Instructor request</div><div class="req">“Show me <b>I<sub>R2</sub></b> on your ammeter and the <b>voltage across ${S.request}</b> on your voltmeter.”</div>
       <div class="ohmbox"><label>Instructor only</label><div class="mono">${rec&&rec.mA!=null?rec.mA.toFixed(3):'____'} mA &nbsp;·&nbsp; ${rec&&rec.V!=null?rec.V.toFixed(3):'____'} V</div></div>
       <div class="row" style="justify-content:flex-end">${ex?'':'<button class="btn sm" id="newReq">Different request</button>'}<button class="btn primary" id="callShow">Call instructor</button></div></div>`;
   }
@@ -894,7 +898,7 @@ function finishExam(){
   rows+=`<tr><td><b>Wiring check</b> · ${S.wireAttempts} attempt(s), ${S.wireErrors??'–'} error(s) left${det(0)}</td><td class="n">${S.mult!=null?'×'+S.mult:'—'}</td></tr>`;
   rows+=`<tr><td><b>Part A · Ohmmeter reading</b>${det(1)}</td><td class="n">${fmtPts(partA)} / 8</td></tr>`;
   rows+=`<tr><td><b>Part B · Measurement chart</b>${det(2)}</td><td class="n">${fmtPts(S.scores[2]||0)} / 12</td></tr>`;
-  rows+=`<tr><td><b>Part B · Demonstrate I<sub>R3</sub> & V<sub>R</sub></b>${det(3)}</td><td class="n">${fmtPts(S.scores[3]||0)} / 8</td></tr>`;
+  rows+=`<tr><td><b>Part B · Demonstrate I<sub>R2</sub> & V<sub>R</sub></b>${det(3)}</td><td class="n">${fmtPts(S.scores[3]||0)} / 8</td></tr>`;
   if(S.deductions.length) rows+=S.deductions.map(d=>`<tr><td>Safety: ${d.text}</td><td class="n">−${d.pts}</td></tr>`).join('');
   rows+=`<tr><td><b>Part B total</b> = (${fmtPts(bRaw)} / 20) × ${S.mult??0}${safety?` − ${safety} safety`:''}${ended?' · test ended early':''}</td><td class="n"><b>${fmtPts(partB)} / 20</b></td></tr>`;
   const el=$('resultSheet');
