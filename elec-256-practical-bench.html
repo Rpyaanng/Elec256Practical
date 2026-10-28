@@ -153,7 +153,7 @@ select,option{background:var(--paper)}
 .sheet{background:var(--paper);border:1px solid var(--line);border-radius:6px;box-shadow:0 20px 60px rgba(20,30,40,.25);width:min(760px,100%);padding:26px 28px;display:flex;flex-direction:column;gap:18px;margin:auto}
 .sheet h1{font-family:var(--f-display);font-size:44px;line-height:.95;margin:0;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
 .sheet h1 span{color:var(--jack)}
-.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .choice{border:1.5px solid var(--ink);border-radius:6px;padding:16px;text-align:left;background:var(--paper);cursor:pointer;display:flex;flex-direction:column;gap:6px}
 .choice:hover{background:var(--paper-2)}
 .choice .t{font-family:var(--f-display);font-weight:700;font-size:26px;text-transform:uppercase}
@@ -246,11 +246,12 @@ select,option{background:var(--paper)}
     <div class="sheet">
       <div class="lbl">ELEC-256 midterm lab · Part B practical</div>
       <h1>Wire it, <span>meter it</span>, get it stamped.</h1>
-      <p class="muted">A bench simulator for the series-parallel practical: banana leads, a trainer board, a DC supply, a bench ammeter and a handheld DMM. Drag to orbit, scroll or pinch to zoom, WASD to move, click jacks to plug in.</p>
+      <p class="muted">A bench simulator for the parallel-circuit practical: banana leads, a trainer board, a DC supply, a bench ammeter and a handheld DMM. Drag to orbit, scroll or pinch to zoom, WASD to move, click jacks to plug in.</p>
       <div class="spec"><b>The circuit:</b> R1 = <b>1.5 kΩ</b>, R2 = <b>750 Ω</b>, R3 = <b>750 Ω</b> and R4 = <b>3 kΩ</b>, all in parallel. Source = <b>30 V</b>. One ammeter, in series with <b>R2</b> on its + side.</div>
       <div class="choices">
         <button class="choice" id="goPractice"><span class="t">Practice</span><ul><li>Step-by-step guided build with highlighted jacks</li><li>Reference schematic and hints</li><li>Check your work as often as you like</li></ul></button>
         <button class="choice" id="goExam"><span class="t">Exam</span><ul><li>Marked like the sheet: ohmmeter /8, chart /12, demonstration /8</li><li>Two wiring checks; leftover errors multiply Part B</li><li>Resistor positions on the board are shuffled</li><li>Energize before the stamp and you lose 20 marks</li></ul></button>
+        <button class="choice" id="goSandbox"><span class="t">Sandbox</span><ul><li>Just the bench and the meters</li><li>No chart, steps, instructor or score</li><li>Wire anything, power up any time</li></ul></button>
       </div>
     </div>
   </div>
@@ -758,6 +759,7 @@ function updateHud(){
   updateHighlights();
 }
 function renderPills(){
+  if(S.mode==='sandbox'){ $('pills').innerHTML=''; $('modeChip').textContent='Sandbox'; $('timer').hidden=true; return; }
   $('pills').innerHTML=STAGES.map((s,i)=>{ const sc=S.scores[i]; const cls=i===S.stage?'cur':(sc!=null?'done':''); let b='';
     if(S.mode==='exam'||S.mode==='free'){ b= i===0 ? `<b>${S.mult!=null?'×'+S.mult:'try '+Math.min(S.wireAttempts+1,2)+'/2'}</b>` : `<b>${sc!=null?fmtPts(sc):'–'}/${s.m}</b>`; }
     return `<span class="pill ${cls}">${i+1} ${s.n} ${b}</span>`; }).join('');
@@ -789,7 +791,7 @@ function truthTable(){
   return `<div class="chartwrap"><table class="tbl"><thead><tr><th></th><th style="text-align:right">R</th><th style="text-align:right">V</th><th style="text-align:right">I</th></tr></thead><tbody>${rows}<tr><td><b>Totals</b></td><td class="n">${fr(t.R_T)}</td><td class="n">${fv(t.V_T)}</td><td class="n">${fi(t.I_T)}</td></tr></tbody></table></div><p class="small muted">Resistances are the true values of the parts in your circuit; voltages and currents are what ideal meters read. R2 reads slightly lower than R3 because of the ammeter in its branch.</p>`;
 }
 function renderGuide(){
-  const g=$('guide'); let h='';
+  const g=$('guide'); let h=''; g.hidden=S.mode==='sandbox'; if(g.hidden){ g.innerHTML=''; return; }
   if(S.mode==='practice'){
     const s=PSTEPS[S.step];
     h+=`<div class="sec stepcard"><div class="stepno">STEP ${S.step+1} OF ${PSTEPS.length}</div><h2>${s.t}</h2>${s.body()}
@@ -844,6 +846,7 @@ function renderFreeDock(d){
 function renderDock(){
   const d=$('dock');
   if(S.mode==='free'){ renderFreeDock(d); return; }
+  if(S.mode==='sandbox'){ d.innerHTML=''; return; }
   if(!S.mode||S.mode==='done'||S.stage>3||(S.mode==='practice'&&PSTEPS[S.step].end)){ d.innerHTML=''; return; }
   const ex=S.mode==='exam', st=S.stage; let act='';
   if(st===0){
@@ -1038,6 +1041,7 @@ window.addEventListener('keydown',e=>{
 $('menuBtn').onclick=()=>{ $('resultOv').hidden=true; $('startOv').hidden=false; };
 $('goPractice').onclick=()=>start('practice');
 $('goExam').onclick=()=>start('exam');
+$('goSandbox').onclick=()=>start('sandbox');
 
 // ================= start / reset =================
 function start(mode){
