@@ -136,6 +136,7 @@ select,option{background:var(--paper)}
 .chart td.na{background:repeating-linear-gradient(135deg,var(--paper-2) 0 4px,var(--paper) 4px 8px)}
 .chart .cell{display:flex;align-items:center;gap:4px}
 .chart .u{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.chart .tv{font-family:var(--f-mono);font-size:11px;color:var(--ok);margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .chart input.good{color:var(--ok);border-color:var(--ok)}
 .chart input.badv{color:var(--bad);border-color:var(--bad)}
 .req{font-size:15px;line-height:1.45;border-left:4px solid var(--jack);padding:4px 10px;background:var(--paper-2)}
@@ -569,6 +570,7 @@ function recompute(){
   if(sol.cc && S.supply.on) flagOnce('short','Supply went into current limit: a short or near-short across the supply while energized.',2);
   updateHud(); drawPS(); drawBM(); drawHH();
   if(S.mode==='practice') checkPracticeStep();
+  if(S.mode==='free'&&S.showTruth) renderGuide();
 }
 function flagOnce(key,text,pts){
   if(S.flagged[key]) return; S.flagged[key]=true;
@@ -660,10 +662,11 @@ function gradeChart(){
   const pairScore=sw=>['R','V','I'].reduce((n,r)=>n+(check(r+'_R2',r+(sw?'_R3':'_R2'))?1:0)+(check(r+'_R3',r+(sw?'_R2':'_R3'))?1:0),0);
   const swapped = !!t && pairScore(true)>pairScore(false);
   const tkey=k=>{ if(!swapped) return k; if(k.endsWith('_R2')) return k.replace('_R2','_R3'); if(k.endsWith('_R3')) return k.replace('_R3','_R2'); return k; };
+  const truthMap={};
   for(const row of ROWS){
     const keys=[...COLS.map(c=>row.r+'_'+c),row.r+'_T']; const bad=[]; let ok=0;
     for(const k of keys){
-      const good=check(k,tkey(k));
+      const good=check(k,tkey(k)); truthMap[k]=t?t[tkey(k)]:null;
       marks[k]=good; if(good) ok++; else bad.push(cellName(k));
       const raw=parseFloat(cellRaw(k).v); if(isFinite(raw)&&raw!==0&&(Math.abs(raw)>=1000||Math.abs(raw)<1)) prefix.push(`${raw} ${cellRaw(k).u} (${cellName(k)})`);
     }
@@ -671,7 +674,7 @@ function gradeChart(){
     if(row.r==='V'&&t&&Math.abs(t.V_T-30)>0.2) note+=` Supply is at ${t.V_T.toFixed(1)} V, not 30 V.`;
     items.push({label:`${row.lab} row`,pts:+(ok*row.marks/5).toFixed(2),max:row.marks,note});
   }
-  S.chartMarks=marks;
+  S.chartMarks=marks; S.chartTruth=t?truthMap:null;
   if(swapped) items.push({label:'R2 / R3 columns',st:'info',note:`Your R2 and R3 columns match the two 750 Ω resistors the other way round. Accepted, since they're the same nominal value and you recorded them consistently. Remember that R2 is the one with the ammeter in its branch.`});
   if(prefix.length) items.push({label:'SI prefixes',st:'info',note:`${prefix.join(', ')}. Values read better with a prefix that keeps the number between 1 and 999 (4.497 kΩ, 3.33 mA). Not deducted here.`});
   return {items,score:items.reduce((s,i)=>s+(i.pts||0),0)};
@@ -756,9 +759,9 @@ function updateHud(){
 }
 function renderPills(){
   $('pills').innerHTML=STAGES.map((s,i)=>{ const sc=S.scores[i]; const cls=i===S.stage?'cur':(sc!=null?'done':''); let b='';
-    if(S.mode==='exam'){ b= i===0 ? `<b>${S.mult!=null?'×'+S.mult:'try '+Math.min(S.wireAttempts+1,2)+'/2'}</b>` : `<b>${sc!=null?fmtPts(sc):'–'}/${s.m}</b>`; }
+    if(S.mode==='exam'||S.mode==='free'){ b= i===0 ? `<b>${S.mult!=null?'×'+S.mult:'try '+Math.min(S.wireAttempts+1,2)+'/2'}</b>` : `<b>${sc!=null?fmtPts(sc):'–'}/${s.m}</b>`; }
     return `<span class="pill ${cls}">${i+1} ${s.n} ${b}</span>`; }).join('');
-  $('modeChip').textContent=S.mode==='exam'?'Exam mode':S.mode==='practice'?'Practice mode':'—';
+  $('modeChip').textContent=S.mode==='exam'?'Exam mode':S.mode==='practice'?'Practice mode':S.mode==='free'?'Free mode':'—';
   $('timer').hidden=S.mode!=='exam';
 }
 const fmtPts=n=>(Math.round(n*100)/100).toString();
@@ -779,6 +782,12 @@ const SCHEM = `<svg class="schem" viewBox="0 0 300 160" role="img" aria-label="S
 <text x="220" y="78">R3</text><text x="220" y="90">750</text>
 <text x="280" y="78">R4</text><text x="280" y="90">3k</text></g>
 <g fill="currentColor"><circle cx="90" cy="20" r="3"/><circle cx="150" cy="20" r="3"/><circle cx="210" cy="20" r="3"/><circle cx="90" cy="140" r="3"/><circle cx="150" cy="140" r="3"/><circle cx="210" cy="140" r="3"/></g></svg>`;
+function truthTable(){
+  const t=truthAll(); if(!t) return '<p class="small muted">The circuit isn\'t wired as specified, so there are no reference values to show. Use Check wiring to find out why.</p>';
+  const fr=r=>r>=1000?(r/1000).toFixed(3)+' kΩ':r.toFixed(1)+' Ω', fv=v=>v.toFixed(3)+' V', fi=i=>(i*1000).toFixed(3)+' mA';
+  const rows=COLS.map(k=>`<tr><td>${k} <span class="muted small">(board ${t.roles[k].name})</span></td><td class="n">${fr(t['R_'+k])}</td><td class="n">${fv(t['V_'+k])}</td><td class="n">${fi(t['I_'+k])}</td></tr>`).join('');
+  return `<div class="chartwrap"><table class="tbl"><thead><tr><th></th><th style="text-align:right">R</th><th style="text-align:right">V</th><th style="text-align:right">I</th></tr></thead><tbody>${rows}<tr><td><b>Totals</b></td><td class="n">${fr(t.R_T)}</td><td class="n">${fv(t.V_T)}</td><td class="n">${fi(t.I_T)}</td></tr></tbody></table></div><p class="small muted">Resistances are the true values of the parts in your circuit; voltages and currents are what ideal meters read. R2 reads slightly lower than R3 because of the ammeter in its branch.</p>`;
+}
 function renderGuide(){
   const g=$('guide'); let h='';
   if(S.mode==='practice'){
@@ -787,6 +796,13 @@ function renderGuide(){
       <div class="row">${s.next?'<button class="btn primary" id="nextBtn">Next</button>':''}${s.end?'<button class="btn primary" id="toExam">Start exam mode</button>':''}${S.step>0?'<button class="btn sm" id="prevBtn">Back</button>':''}${!s.next&&!s.end?'<button class="btn sm" id="skipBtn">Skip step</button>':''}</div></div>`;
     if(S.lastFb) h+=`<div class="sec"><div class="lbl">Instructor feedback</div>${fbList(S.lastFb)}</div>`;
     h+=`<div class="sec"><div class="lbl">Reference circuit</div>${SCHEM}<p class="small muted">Each branch connects straight across the supply, so every resistor sees 30 V. The total current splits four ways; R2's share passes through the ammeter first.</p></div>`;
+  } else if(S.mode==='free'){
+    h+=`<div class="sec stepcard"><div class="stepno">EXAM FINISHED · FREE MODE</div><h2>Explore your bench</h2><p>Your exam is marked and the score is locked. The bench is unlocked: rewire, power up and measure anything. The check buttons give feedback only.</p>
+      <div class="row"><button class="btn sm" id="fCheckWire">Check wiring</button><button class="btn sm" id="fCheckChart">Check chart</button><button class="btn sm" id="fTruth">${S.showTruth?'Hide meter values':'Show meter values'}</button></div>
+      <div class="row"><button class="btn sm" id="fResult">See my result</button><button class="btn sm primary" id="fNewExam">New exam</button></div></div>`;
+    if(S.showTruth) h+=`<div class="sec"><div class="lbl">What the meters read <span class="r">${S.supply.on?'live':'at '+(S.supply.set>0?S.supply.set:30).toFixed(1)+' V'}</span></div>${truthTable()}</div>`;
+    if(S.lastFb) h+=`<div class="sec"><div class="lbl">${S.fbTitle||'Feedback'}</div>${fbList(S.lastFb)}</div>`;
+    h+=`<div class="sec"><div class="lbl">Reference circuit</div>${SCHEM}</div>`;
   } else if(S.mode==='exam' && S.stage<=3){
     const titles=['Measure, build & get checked','Ohmmeter reading','Energize & record','Demonstrate I<sub>R2</sub> & V<sub>R</sub>'];
     const marks=['sets the Part B multiplier','Part A · 8 marks','Part B · 12 marks','Part B · 8 marks'];
@@ -801,18 +817,33 @@ function renderGuide(){
     if(S.deductions.length) h+=`<div class="sec"><div class="lbl">Safety deductions <span class="r">from Part B</span></div>${fbList(S.deductions.map(d=>({label:'Safety',st:'no',pts:-d.pts,note:d.text})))}</div>`;
   }
   g.innerHTML=h;
+  const fb=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
+  fb('fCheckWire',()=>{ const w=gradeWiring(); S.lastFb=w.items; S.fbTitle=`Wiring check · ${w.errors} error${w.errors===1?'':'s'}`; renderGuide(); toast(w.errors?`${w.errors} wiring error${w.errors===1?'':'s'}. See the list.`:'Wiring is correct.',w.errors?'bad':'good'); });
+  fb('fCheckChart',()=>{ const c=gradeChart(); S.lastFb=c.items; S.fbTitle=`Chart check · ${fmtPts(c.score)} / 12`; S.chartOpen=true; renderDock(); renderGuide(); toast(`Chart would score ${fmtPts(c.score)} / 12. Red cells need another look.`,c.score>=12?'good':''); });
+  fb('fTruth',()=>{ S.showTruth=!S.showTruth; renderGuide(); });
+  fb('fResult',()=>{ $('resultOv').hidden=false; });
+  fb('fNewExam',()=>start('exam'));
   const nb=$('nextBtn'); if(nb) nb.onclick=()=>advanceStep();
   const pb=$('prevBtn'); if(pb) pb.onclick=()=>{ S.step--; S.stage=PSTEPS[S.step].st; S.lastFb=null; renderAll(); };
   const sb=$('skipBtn'); if(sb) sb.onclick=()=>advanceStep();
   const te=$('toExam'); if(te) te.onclick=()=>start('exam');
 }
+function trueFmt(k,v){ const r=k[0]; if(r==='R') return v>=1000?(v/1000).toFixed(3)+' kΩ':v.toFixed(1)+' Ω'; if(r==='V') return v.toFixed(3)+' V'; return (v*1000).toFixed(3)+' mA'; }
 function chartHTML(){
   const locked=S.mode==='exam'&&S.scores[2]!=null;
-  const cell=k=>{ const c=cellRaw(k); const m=S.chartMarks[k]; const cls=m===true?'good':m===false?'badv':''; return `<div class="cell"><input id="ch_${k}" data-k="${k}" class="${cls}" inputmode="decimal" value="${c.v}" ${locked?'disabled':''} aria-label="${cellName(k)} value"><select id="cu_${k}" data-k="${k}" ${locked?'disabled':''} aria-label="${cellName(k)} unit">${UNITS[k[0]].map(u=>`<option${u[0]===c.u?' selected':''}>${u[0]}</option>`).join('')}</select></div>`; };
+  const cell=k=>{ const c=cellRaw(k); const m=S.chartMarks[k]; const cls=m===true?'good':m===false?'badv':''; return `<div class="cell"><input id="ch_${k}" data-k="${k}" class="${cls}" inputmode="decimal" value="${c.v}" ${locked?'disabled':''} aria-label="${cellName(k)} value"><select id="cu_${k}" data-k="${k}" ${locked?'disabled':''} aria-label="${cellName(k)} unit">${UNITS[k[0]].map(u=>`<option${u[0]===c.u?' selected':''}>${u[0]}</option>`).join('')}</select></div>${S.mode==='free'&&m===false&&S.chartTruth&&S.chartTruth[k]!=null?`<div class="tv">true: ${trueFmt(k,S.chartTruth[k])}</div>`:''}`; };
   return `<div class="chartwrap"><table class="chart"><thead><tr><th></th>${COLS.map(c=>`<th>${c}</th>`).join('')}<th colspan="2">Totals</th></tr></thead><tbody>${ROWS.map(r=>`<tr><th scope="row">${r.lab}<br><span class="u">${r.marks} marks</span></th>${COLS.map(c=>`<td>${cell(r.r+'_'+c)}</td>`).join('')}<td class="tl">${r.tot} =</td><td>${cell(r.r+'_T')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderFreeDock(d){
+  d.innerHTML=`<div class="sec"><div class="lbl"><span>Your chart <span class="r">free mode · editable</span></span><button class="btn sm" id="chartToggle" aria-expanded="${S.chartOpen}">${S.chartOpen?'Hide chart':'Show chart'}</button></div>${S.chartOpen?chartHTML()+'<p class="small muted">Change any value, then use Check chart on the left to re-mark it. Red cells show the true value underneath.</p>':''}</div>`;
+  $('chartToggle').onclick=()=>{ S.chartOpen=!S.chartOpen; renderFreeDock(d); };
+  const touch=k=>{ const el=$('ch_'+k); if(el) el.classList.remove('good','badv'); delete S.chartMarks[k]; };
+  d.querySelectorAll('.chart input').forEach(inp=>inp.oninput=e=>{ const k=e.target.dataset.k; S.chartVals[k]={...cellRaw(k),v:e.target.value}; touch(k); });
+  d.querySelectorAll('.chart select').forEach(sel=>sel.onchange=e=>{ const k=e.target.dataset.k; S.chartVals[k]={...cellRaw(k),u:e.target.value}; touch(k); });
 }
 function renderDock(){
   const d=$('dock');
+  if(S.mode==='free'){ renderFreeDock(d); return; }
   if(!S.mode||S.mode==='done'||S.stage>3||(S.mode==='practice'&&PSTEPS[S.step].end)){ d.innerHTML=''; return; }
   const ex=S.mode==='exam', st=S.stage; let act='';
   if(st===0){
@@ -906,11 +937,11 @@ function finishExam(){
     <div class="row" style="align-items:baseline;gap:16px"><div class="total">${fmtPts(total)}<small> / 28</small></div><p class="muted" style="flex:1;min-width:220px">${why}</p></div>
     <table class="tbl"><thead><tr><th>Item</th><th style="text-align:right">Marks</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="small muted">Out of 28: Part A's 8-mark ohmmeter box plus Part B's 20. The 12-mark schematic in Part A isn't simulated, so the real sheet totals 40.</p>
-    <div class="row"><button class="btn primary" id="again">Retry exam</button><button class="btn" id="toPractice">Guided practice</button><button class="btn" id="viewBench">Look at my bench</button></div>`;
+    <div class="row"><button class="btn primary" id="again">Retry exam</button><button class="btn" id="toPractice">Guided practice</button><button class="btn" id="viewBench">Free mode on this bench</button></div>`;
   $('resultOv').hidden=false;
   $('again').onclick=()=>{ $('resultOv').hidden=true; start('exam'); };
   $('toPractice').onclick=()=>{ $('resultOv').hidden=true; start('practice'); };
-  $('viewBench').onclick=()=>{ $('resultOv').hidden=true; S.mode='done'; $('dock').innerHTML=''; $('guide').innerHTML=''; };
+  $('viewBench').onclick=()=>{ $('resultOv').hidden=true; S.mode='free'; S.stage=4; S.lastFb=null; S.showTruth=false; S.chartOpen=true; S.held=null; S.pending=null; renderAll(); toast('Free mode: the bench is unlocked.'); };
   S.stage=4; renderPills();
 }
 
